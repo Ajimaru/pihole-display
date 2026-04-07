@@ -157,7 +157,7 @@ def screen_unbound():
     draw.text((s(0), s(17)), 'Cache:  67.2%', font=FONT_MD, fill=1)
     draw.text((s(0), s(30)), 'Q/s:      4.1', font=FONT_MD, fill=1)
     draw.text((s(0), s(43)), 'Total: 12,847', font=FONT_MD, fill=1)
-    nav_hint(draw, 'Flush')
+    nav_hint(draw, 'Menu')
     save(img, '04_unbound.png')
 
 
@@ -166,7 +166,7 @@ def screen_unbound_error():
     img, draw = new_image()
     header(draw, 'Unbound', status='ERROR', ok=False)
     draw.text((s(0), s(17)), 'Error: not active', font=FONT_SM, fill=1)
-    nav_hint(draw, 'Restart')
+    nav_hint(draw, 'Menu')
     save(img, '05_unbound_error.png')
 
 

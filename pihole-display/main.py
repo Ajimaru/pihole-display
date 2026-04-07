@@ -56,7 +56,7 @@ class App:  # pylint: disable=too-few-public-methods
         self._running = True
 
         # Initial data fetch
-        self._display.show_message('Loading data...')
+        self._display.show_splash()
         self._data.refresh()
 
         self._buttons.start()

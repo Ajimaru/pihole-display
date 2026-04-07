@@ -179,6 +179,20 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         """Close menu and return to normal screen mode."""
         self._mode = UIMode.NORMAL
 
+    def show_splash(self):
+        """Render startup splash screen directly to the display."""
+        with canvas(self._device) as draw:
+            draw.text((20, 8), 'pihole-display', font=_FONT_LG, fill='white')
+            draw.line([(10, 22), (self.W - 10, 22)], fill='white', width=1)
+            draw.text(
+                (15, 26), 'BeagleBone Black', font=_FONT_SM, fill='white',
+            )
+            draw.text(
+                (10, 37), 'Pi-hole + Unbound', font=_FONT_SM, fill='white',
+            )
+            draw.text((20, 50), 'Loading data...', font=_FONT_SM, fill='white')
+        self._wake()
+
     def show_message(self, text: str, duration: float = 2.0):
         """Show a temporary centered message for the given duration."""
         self._msg_text = text
@@ -373,7 +387,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
                 fill='white',
             )
 
-        self._nav_hint(draw, 'Flush')
+        self._nav_hint(draw, 'Menu')
 
     def _screen_network(self, draw):
         sy = self._data.system

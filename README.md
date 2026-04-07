@@ -35,10 +35,10 @@ K4  (*)      →  P8 Pin 10   GPIO2_4
 
 - Pi-hole
   Description: Block %, queries, clients
-  Action key (#): Pause / disable menu
+  Action key (#): Pause / disable / gravity menu
 - Unbound
   Description: Cache hit %, Q/s, total
-  Action key (#): Flush cache
+  Action key (#): Cache / restart menu
 - Network
   Description: IP, gateway, hostname, uptime
   Action key (#): -
@@ -47,7 +47,7 @@ K4  (*)      →  P8 Pin 10   GPIO2_4
   Action key (#): -
 - Status
   Description: Service health overview
-  Action key (#): Restart menu
+  Action key (#): Actions menu
 
 ### Button layout
 
@@ -58,6 +58,7 @@ K3 (#)  short  → open action menu / confirm
 K4 (*)  short  → home screen     / cancel
 K1 (^)  long   → force data refresh
 K2 (v)  long   → toggle display sleep
+K4 (*)  long   → home screen
 ```
 
 ## Mockups
@@ -66,23 +67,33 @@ K2 (v)  long   → toggle display sleep
 
 ### Main screens
 
-- Splash: ![splash](docs/mockups/00_splash.png)
-- Pi-hole active: ![active](docs/mockups/01_pihole_active.png)
-- Pi-hole paused: ![paused](docs/mockups/02_pihole_pause.png)
-- Pi-hole off: ![off](docs/mockups/03_pihole_off.png)
-
-- Unbound: ![unbound](docs/mockups/04_unbound.png)
-- Network: ![network](docs/mockups/06_network.png)
-- System: ![system](docs/mockups/07_system.png)
-- Status: ![status](docs/mockups/08_status_ok.png)
-
-### Menus
+- Splash:  
+  ![splash](docs/mockups/00_splash.png)
+- Pi-hole active:  
+  ![active](docs/mockups/01_pihole_active.png)
+- Pi-hole paused:  
+  ![paused](docs/mockups/02_pihole_pause.png)
+- Pi-hole off:  
+  ![off](docs/mockups/03_pihole_off.png)
+- Unbound:
+  ![unbound](docs/mockups/04_unbound.png)
+- Unbound (error):
+  ![unbound-error](docs/mockups/05_unbound_error.png)
+- Network:
+  ![network](docs/mockups/06_network.png)
+- System:  
+  ![system](docs/mockups/07_system.png)
+- Status:  
+  ![status](docs/mockups/08_status_ok.png)
+- Status (error):
+  ![status-error](docs/mockups/09_status_error.png)
 
 - Pi-hole menu: ![m1](docs/mockups/10_menu_pihole_active.png)
 - Scrolled: ![m2](docs/mockups/11_menu_pihole_scroll.png)
 - Pi-hole off: ![m3](docs/mockups/12_menu_pihole_off.png)
 - Unbound: ![m4](docs/mockups/13_menu_unbound.png)
 - Status actions: ![m5](docs/mockups/14_menu_status_actions.png)
+- Status actions (scrolled): ![m6](docs/mockups/14b_menu_status_scrolled.png)
 
 ### Status messages
 
@@ -114,11 +125,12 @@ sudo journalctl -u pihole-display -f
 Edit `pihole-display/config.py` before installation:
 
 ```python
-I2C_PORT       = 2        # /dev/i2c-2
-I2C_ADDRESS    = 0x3C     # or 0x3D
-PIHOLE_PASSWORD = ''      # Pi-hole v6 only
-REFRESH_INTERVAL = 10     # seconds
-DISPLAY_TIMEOUT  = 60     # seconds until sleep (0 = never)
+I2C_PORT         = 2           # /dev/i2c-2
+I2C_ADDRESS      = 0x3C        # or 0x3D
+PIHOLE_HOST      = 'localhost' # Pi-hole host
+PIHOLE_PASSWORD  = ''          # Pi-hole v6 only
+REFRESH_INTERVAL = 10          # seconds
+DISPLAY_TIMEOUT  = 60          # seconds until sleep (0 = never)
 ```
 
 ## Project structure
