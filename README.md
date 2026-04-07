@@ -67,29 +67,29 @@ K2 (v)  long   → toggle display sleep
 ### Main screens
 
 - Splash: ![splash](docs/mockups/00_splash.png)
-- Pi-hole active: ![active](docs/mockups/01_pihole_aktiv.png)
+- Pi-hole active: ![active](docs/mockups/01_pihole_active.png)
 - Pi-hole paused: ![paused](docs/mockups/02_pihole_pause.png)
-- Pi-hole off: ![off](docs/mockups/03_pihole_aus.png)
+- Pi-hole off: ![off](docs/mockups/03_pihole_off.png)
 
 - Unbound: ![unbound](docs/mockups/04_unbound.png)
-- Network: ![network](docs/mockups/06_netzwerk.png)
+- Network: ![network](docs/mockups/06_network.png)
 - System: ![system](docs/mockups/07_system.png)
 - Status: ![status](docs/mockups/08_status_ok.png)
 
 ### Menus
 
-- Pi-hole menu: ![m1](docs/mockups/10_menu_pihole_aktiv.png)
+- Pi-hole menu: ![m1](docs/mockups/10_menu_pihole_active.png)
 - Scrolled: ![m2](docs/mockups/11_menu_pihole_scroll.png)
-- Pi-hole off: ![m3](docs/mockups/12_menu_pihole_aus.png)
+- Pi-hole off: ![m3](docs/mockups/12_menu_pihole_off.png)
 - Unbound: ![m4](docs/mockups/13_menu_unbound.png)
-- Status actions: ![m5](docs/mockups/14_menu_status.png)
+- Status actions: ![m5](docs/mockups/14_menu_status_actions.png)
 
 ### Status messages
 
-- Pause: ![p](docs/mockups/15_msg_pause.png)
-- Active: ![a](docs/mockups/16_msg_aktiv.png)
-- Flush: ![f](docs/mockups/18_msg_flush.png)
-- Gravity update: ![g](docs/mockups/19_msg_gravity.png)
+- Pause: ![p](docs/mockups/15_message_pause.png)
+- Active: ![a](docs/mockups/16_message_active.png)
+- Flush: ![f](docs/mockups/18_message_flush.png)
+- Gravity update: ![g](docs/mockups/19_message_gravity_update.png)
 
 ## Installation
 

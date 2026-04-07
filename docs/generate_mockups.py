@@ -14,6 +14,8 @@ SCALE = 4  # 4x enlarged for better readability
 W, H = 128, 64
 SW, SH = W * SCALE, H * SCALE
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR = os.path.join(OUT_DIR, 'mockups')
+os.makedirs(OUT_DIR, exist_ok=True)
 
 # ── Fonts ────────────────────────────────────────────────────
 
@@ -120,7 +122,7 @@ def screen_pihole_active():
     draw.text((s(0), s(30)), 'Req:     4,821', font=FONT_MD, fill=1)
     draw.text((s(0), s(43)), 'Clients:     8', font=FONT_MD, fill=1)
     nav_hint(draw, 'Menu')
-    save(img, '01_pihole_aktiv.png')
+    save(img, '01_pihole_active.png')
 
 
 def screen_pihole_paused():
@@ -142,7 +144,7 @@ def screen_pihole_off():
     draw.text((s(0), s(30)), 'Req:     4,821', font=FONT_MD, fill=1)
     draw.text((s(0), s(43)), 'Clients:     8', font=FONT_MD, fill=1)
     nav_hint(draw, 'Menu')
-    save(img, '03_pihole_aus.png')
+    save(img, '03_pihole_off.png')
 
 
 # ── Screen 2: Unbound ───────────────────────────────────────
@@ -165,7 +167,7 @@ def screen_unbound_error():
     header(draw, 'Unbound', status='ERROR', ok=False)
     draw.text((s(0), s(17)), 'Error: not active', font=FONT_SM, fill=1)
     nav_hint(draw, 'Restart')
-    save(img, '05_unbound_fehler.png')
+    save(img, '05_unbound_error.png')
 
 
 # ── Screen 3: Network ───────────────────────────────────────
@@ -180,7 +182,7 @@ def screen_network():
     draw.text((s(0), s(36)), 'Host: beaglebone',   font=FONT_SM, fill=1)
     draw.text((s(0), s(44)), 'Up:   3d 14:22',     font=FONT_SM, fill=1)
     nav_hint(draw)
-    save(img, '06_netzwerk.png')
+    save(img, '06_network.png')
 
 
 # ── Screen 4: System ────────────────────────────────────────
@@ -219,7 +221,7 @@ def screen_status_error():
     draw.text((s(0), s(28)), '[!!] Unbound ', font=FONT_SM, fill=1)
     draw.text((s(0), s(39)), '[OK] DNS     ', font=FONT_SM, fill=1)
     nav_hint(draw, 'Actions')
-    save(img, '09_status_fehler.png')
+    save(img, '09_status_error.png')
 
 
 # ── Menu: Pi-hole (active) ──────────────────────────────────
@@ -245,7 +247,7 @@ def menu_pihole_active():
         '  Pause 15 min',
         '  Pause 30 min',
     ])
-    save(img, '10_menu_pihole_aktiv.png')
+    save(img, '10_menu_pihole_active.png')
 
 
 def menu_pihole_active2():
@@ -267,7 +269,7 @@ def menu_pihole_off():
         '  Gravity upd.',
         '  Clear DNS cache',
     ])
-    save(img, '12_menu_pihole_aus.png')
+    save(img, '12_menu_pihole_off.png')
 
 
 # ── Menu: Unbound ───────────────────────────────────────────
@@ -294,7 +296,7 @@ def menu_status():
         '  Restart Unbound',
         '  Restart all',
     ])
-    save(img, '14_menu_status.png')
+    save(img, '14_menu_status_actions.png')
 
 
 def menu_status2():
@@ -304,7 +306,7 @@ def menu_status2():
         '  Restart all',
         '> Refresh data',
     ])
-    save(img, '14b_menu_status_scroll.png')
+    save(img, '14b_menu_status_scrolled.png')
 
 
 # ── Messages ────────────────────────────────────────────────
@@ -372,11 +374,14 @@ if __name__ == '__main__':
     menu_status2()
 
     print('--- Messages ---')
-    message('Pi-hole\nPause 15 min...', '15_msg_pause.png')
-    message('Pi-hole\nACTIVE', '16_msg_aktiv.png')
-    message('Pi-hole\nOFF', '17_msg_aus.png')
-    message('Cache\ncleared', '18_msg_flush.png')
-    message('Gravity\nupdate...\n(takes time!)', '19_msg_gravity.png')
+    message('Pi-hole\nPause 15 min...', '15_message_pause.png')
+    message('Pi-hole\nACTIVE', '16_message_active.png')
+    message('Pi-hole\nOFF', '17_message_off.png')
+    message('Cache\ncleared', '18_message_flush.png')
+    message(
+        'Gravity\nupdate...\n(takes time!)',
+        '19_message_gravity_update.png',
+    )
     screen_sleep()
 
     print()
