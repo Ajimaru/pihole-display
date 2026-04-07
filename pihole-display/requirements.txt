@@ -1,0 +1,4 @@
+luma.oled>=3.13.0
+Pillow>=12.1.1
+requests>=2.33.0
+psutil>=5.9.0
