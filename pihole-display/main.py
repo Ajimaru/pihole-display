@@ -2,14 +2,14 @@
 """Main runtime loop for pihole-display UI and button interaction."""
 
 # ============================================================
-# main.py — pihole-display Hauptprogramm
-# BeagleBone Black + SSD1315 OLED + 4 Tasten
+# main.py — pihole-display main program
+# BeagleBone Black + SSD1315 OLED + 4 buttons
 #
-# Tasten:
-#   K1 (^) = vorheriger Screen / Menü hoch
-#   K2 (v) = nächster Screen   / Menü runter
-#   K3 (#) = Aktion / Bestätigen
-#   K4 (*) = Zurück / lang = Home
+# Buttons:
+#   K1 (^) = previous screen / menu up
+#   K2 (v) = next screen     / menu down
+#   K3 (#) = action / confirm
+#   K4 (*) = back / long = home
 # ============================================================
 
 import logging
@@ -33,7 +33,7 @@ logging.basicConfig(
 log = logging.getLogger('main')
 
 
-# ── Applikation ──────────────────────────────────────────────
+# ── Application ──────────────────────────────────────────────
 
 class App:  # pylint: disable=too-few-public-methods
     """Wire data, display, and button components into one application."""
@@ -52,51 +52,51 @@ class App:  # pylint: disable=too-few-public-methods
 
         The loop also handles periodic data refresh and clean shutdown.
         """
-        log.info('pihole-display startet')
+        log.info('pihole-display starting')
         self._running = True
 
-        # Erster Datenabruf
-        self._display.show_message('Lade Daten...')
+        # Initial data fetch
+        self._display.show_message('Loading data...')
         self._data.refresh()
 
         self._buttons.start()
 
-        # Signal-Handler
+        # Signal handlers
         signal.signal(signal.SIGTERM, self._shutdown)
         signal.signal(signal.SIGINT,  self._shutdown)
 
-        log.info('Hauptschleife aktiv')
+        log.info('Main loop active')
         try:
             while self._running:
-                # Daten bei Bedarf aktualisieren
+                # Refresh data when needed
                 if self._data.needs_refresh():
                     with self._data_lock:
                         self._data.refresh()
 
-                # Display rendern
+                # Render display
                 self._display.update()
                 time.sleep(0.1)
         except (RuntimeError, OSError, ValueError) as e:
-            log.error('Hauptschleife Fehler: %s', e)
+            log.error('Main loop error: %s', e)
         finally:
             self._cleanup()
 
     def _shutdown(self, *_):
-        log.info('Beende...')
+        log.info('Shutting down...')
         self._running = False
 
     def _cleanup(self):
         self._buttons.stop()
         self._display.cleanup()
-        log.info('Beendet')
+        log.info('Stopped')
 
-    # ── Button-Handler ───────────────────────────────────────
+    # ── Button handler ───────────────────────────────────────
 
     def _on_button(self, event: ButtonEvent):
-        """Wird im Button-Thread aufgerufen — schnell halten!"""
+        """Called from the button thread - keep it fast."""
         mode = self._display.mode
 
-        # Display aufwecken bei jedem Druck
+        # Wake display on every button press
         if mode == UIMode.SLEEP:
             self._display.wake()
             return
@@ -122,15 +122,15 @@ class App:  # pylint: disable=too-few-public-methods
             self._display.home()
 
         elif event == ButtonEvent.OK_SHORT:
-            # Screen-spezifische Aktion
+            # Screen-specific action
             self._open_screen_menu(screen)
 
         elif event == ButtonEvent.UP_LONG:
-            # Manueller Daten-Refresh
-            self._trigger_refresh('Aktualisiere...')
+            # Manual data refresh
+            self._trigger_refresh('Refreshing...')
 
         elif event == ButtonEvent.DOWN_LONG:
-            # Display schlafen
+            # Put display to sleep
             self._display.toggle_sleep()
 
     def _handle_menu_input(self, event: ButtonEvent):
@@ -143,13 +143,13 @@ class App:  # pylint: disable=too-few-public-methods
         elif event == ButtonEvent.OK_SHORT:
             action = self._display.menu_confirm()
             if action:
-                # Aktion in eigenem Thread ausführen (kann länger dauern)
+                # Run action in a separate thread (can take longer)
                 threading.Thread(target=action, daemon=True).start()
 
         elif event in (ButtonEvent.BACK_SHORT, ButtonEvent.BACK_LONG):
             self._display.menu_cancel()
 
-    # ── Screen-Menüs ─────────────────────────────────────────
+    # ── Screen menus ─────────────────────────────────────────
 
     def _open_screen_menu(self, screen: Screen):
         if screen == Screen.PIHOLE:
@@ -158,7 +158,7 @@ class App:  # pylint: disable=too-few-public-methods
             self._menu_unbound()
         elif screen == Screen.STATUS:
             self._menu_status()
-        # NETWORK und SYSTEM haben kein Menü
+        # NETWORK and SYSTEM have no menu
 
     def _menu_pihole(self):
         ph = self._data.pihole
@@ -170,94 +170,94 @@ class App:  # pylint: disable=too-few-public-methods
                     f'Pause {label}',
                     partial(self._pihole_pause, secs)
                 ))
-            items.append(('Deaktivieren', self._pihole_disable))
+            items.append(('Disable', self._pihole_disable))
         else:
-            items.append(('Aktivieren', self._pihole_enable))
+            items.append(('Enable', self._pihole_enable))
 
         items += [
-            ('Gravity Update',  self._pihole_gravity),
-            ('DNS Cache leeren', self._pihole_flush),
+            ('Gravity update',  self._pihole_gravity),
+            ('Clear DNS cache', self._pihole_flush),
         ]
         self._display.show_menu(items)
 
     def _menu_unbound(self):
         self._display.show_menu([
-            ('Cache leeren', self._unbound_flush),
-            ('Neustart',     self._unbound_restart),
+            ('Clear cache', self._unbound_flush),
+            ('Restart',     self._unbound_restart),
         ])
 
     def _menu_status(self):
         self._display.show_menu([
-            ('Pi-hole neu starten',  self._pihole_restart),
-            ('Unbound neu starten',  self._unbound_restart),
-            ('Alles neu starten',    self._restart_all),
+            ('Restart Pi-hole',  self._pihole_restart),
+            ('Restart Unbound',  self._unbound_restart),
+            ('Restart all',      self._restart_all),
             (
-                'Daten aktualisieren',
-                lambda: self._trigger_refresh('Aktualisiere...'),
+                'Refresh data',
+                lambda: self._trigger_refresh('Refreshing...'),
             ),
         ])
 
-    # ── Aktionen ─────────────────────────────────────────────
+    # ── Actions ──────────────────────────────────────────────
 
     def _pihole_pause(self, seconds: int):
         mins = seconds // 60
-        self._display.show_message(f'Pi-hole\nPause {mins} Min...')
+        self._display.show_message(f'Pi-hole\nPause {mins} min...')
         ok = self._data.pihole_set_blocking(False, seconds)
         self._display.show_message(
-            'Pi-hole pausiert' if ok else 'Fehler!'
+            'Pi-hole paused' if ok else 'Error!'
         )
 
     def _pihole_disable(self):
-        self._display.show_message('Pi-hole\ndeaktiviere...')
+        self._display.show_message('Pi-hole\ndisabling...')
         ok = self._data.pihole_set_blocking(False, 0)
         self._display.show_message(
-            'Pi-hole AUS' if ok else 'Fehler!'
+            'Pi-hole OFF' if ok else 'Error!'
         )
 
     def _pihole_enable(self):
-        self._display.show_message('Pi-hole\naktiviere...')
+        self._display.show_message('Pi-hole\nenabling...')
         ok = self._data.pihole_set_blocking(True)
         self._display.show_message(
-            'Pi-hole AKTIV' if ok else 'Fehler!'
+            'Pi-hole ACTIVE' if ok else 'Error!'
         )
 
     def _pihole_gravity(self):
         self._display.show_message(
-            'Gravity\nUpdate...\n(dauert!)',
+            'Gravity\nupdate...\n(takes time!)',
             duration=120,
         )
         ok = self._data.pihole_gravity_update()
         self._display.show_message(
-            'Update OK' if ok else 'Fehler!'
+            'Update OK' if ok else 'Error!'
         )
         self._trigger_refresh()
 
     def _pihole_flush(self):
-        self._display.show_message('Flushe\nDNS Cache...')
+        self._display.show_message('Flushing\nDNS cache...')
         ok = self._data.pihole_flush()
         self._display.show_message(
-            'Cache geleert' if ok else 'Fehler!'
+            'Cache cleared' if ok else 'Error!'
         )
 
     def _pihole_restart(self):
-        self._display.show_message('Pi-hole\nNeustart...')
+        self._display.show_message('Pi-hole\nRestarting...')
         subprocess.run(
             ['pihole', 'restartdns'],
             capture_output=True,
             timeout=15,
             check=False,
         )
-        self._trigger_refresh('Neustart OK')
+        self._trigger_refresh('Restart OK')
 
     def _unbound_flush(self):
-        self._display.show_message('Unbound\nCache leeren...')
+        self._display.show_message('Unbound\nClearing cache...')
         ok = self._data.unbound_flush()
         self._display.show_message(
-            'Cache geleert' if ok else 'Fehler!'
+            'Cache cleared' if ok else 'Error!'
         )
 
     def _unbound_restart(self):
-        self._display.show_message('Unbound\nNeustart...')
+        self._display.show_message('Unbound\nRestarting...')
         subprocess.run(
             ['systemctl', 'restart', 'unbound'],
             capture_output=True,
@@ -265,7 +265,7 @@ class App:  # pylint: disable=too-few-public-methods
             check=False,
         )
         time.sleep(2)
-        self._trigger_refresh('Neustart OK')
+        self._trigger_refresh('Restart OK')
 
     def _restart_all(self):
         self._pihole_restart()

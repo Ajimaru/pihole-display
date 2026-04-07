@@ -1,7 +1,7 @@
 """Fetch and cache Pi-hole, Unbound, and system telemetry for the UI."""
 
 # ============================================================
-# data.py — Datenabruf: Pi-hole, Unbound, System
+# data.py — Data retrieval: Pi-hole, Unbound, System
 # ============================================================
 
 import subprocess
@@ -32,17 +32,17 @@ class PiholeStats:  # pylint: disable=too-many-instance-attributes
     block_percent: float = 0.0
     clients: int = 0
     domains_blocked: int = 0
-    pause_remaining: int = 0  # Sekunden verbleibend bei Pause
-    version: int = 5  # API-Version (5 oder 6)
+    pause_remaining: int = 0  # Remaining seconds while paused
+    version: int = 5  # API version (5 or 6)
     error: str = ''
 
 
 class PiholeAPI:
-    """Unterstützt Pi-hole v5 und v6."""
+    """Supports Pi-hole v5 and v6."""
 
     def __init__(self):
-        self._session_token = None  # für v6
-        self._api_token = None  # für v5
+        self._session_token = None  # for v6
+        self._api_token = None  # for v5
         self._version = None
         self._base_v5 = f'http://{config.PIHOLE_HOST}/admin/api.php'
         self._base_v6 = f'http://{config.PIHOLE_HOST}/api'
@@ -81,7 +81,7 @@ class PiholeAPI:
             self._session_token = data.get('session', {}).get('sid')
             return bool(self._session_token)
         except (requests.RequestException, ValueError, TypeError) as e:
-            log.warning('Pi-hole v6 Auth fehlgeschlagen: %s', e)
+            log.warning('Pi-hole v6 auth failed: %s', e)
             return False
 
     def _headers_v6(self) -> dict:
@@ -95,7 +95,7 @@ class PiholeAPI:
         if self._version is None:
             self._version = self._detect_version()
             stats.version = self._version
-            log.info('Pi-hole API Version: %d', self._version)
+            log.info('Pi-hole API version: %d', self._version)
 
         try:
             if self._version == 6:
@@ -108,7 +108,7 @@ class PiholeAPI:
             OSError,
         ) as e:
             stats.error = str(e)
-            log.error('Pi-hole Fehler: %s', e)
+            log.error('Pi-hole error: %s', e)
             return stats
 
     def _fetch_v5(self, stats: PiholeStats) -> PiholeStats:
@@ -170,7 +170,7 @@ class PiholeAPI:
             TypeError,
             OSError,
         ) as e:
-            log.error('Pi-hole Blocking setzen fehlgeschlagen: %s', e)
+            log.error('Failed to set Pi-hole blocking: %s', e)
             return False
 
     def _set_blocking_v5(self, enable: bool, seconds: int) -> bool:
@@ -178,7 +178,7 @@ class PiholeAPI:
             self._api_token = self._load_v5_token()
         if not self._api_token:
             log.warning(
-                'Kein Pi-hole API Token — enable/disable nicht möglich',
+                'No Pi-hole API token - enable/disable not possible',
             )
             return False
         if enable:
@@ -210,7 +210,7 @@ class PiholeAPI:
             )
             return result.returncode == 0
         except (OSError, subprocess.SubprocessError) as e:
-            log.error('Pi-hole flush fehlgeschlagen: %s', e)
+            log.error('Pi-hole flush failed: %s', e)
             return False
 
     def update_gravity(self) -> bool:
@@ -222,7 +222,7 @@ class PiholeAPI:
             )
             return result.returncode == 0
         except (OSError, subprocess.SubprocessError) as e:
-            log.error('Gravity-Update fehlgeschlagen: %s', e)
+            log.error('Gravity update failed: %s', e)
             return False
 
 
@@ -257,7 +257,7 @@ class UnboundData:
                 check=False,
             )
             if result.returncode != 0:
-                stats.error = 'unbound-control Fehler'
+                stats.error = 'unbound-control error'
                 return stats
 
             d = {}
@@ -281,14 +281,14 @@ class UnboundData:
             )
             uptime = float(d.get('time.elapsed', 0))
             stats.uptime_sec = int(uptime)
-            # Queries/s aus uptime und total
+            # Queries/s based on uptime and total queries
             if uptime > 0:
                 stats.queries_ps = round(total_q / uptime, 1)
         except FileNotFoundError:
-            stats.error = 'unbound-control nicht gefunden'
+            stats.error = 'unbound-control not found'
         except (OSError, ValueError, subprocess.SubprocessError) as e:
             stats.error = str(e)
-            log.error('Unbound Fehler: %s', e)
+            log.error('Unbound error: %s', e)
         return stats
 
     def flush_cache(self) -> bool:
@@ -300,7 +300,7 @@ class UnboundData:
             )
             return result.returncode == 0
         except (OSError, subprocess.SubprocessError) as e:
-            log.error('Unbound flush fehlgeschlagen: %s', e)
+            log.error('Unbound flush failed: %s', e)
             return False
 
 
@@ -377,7 +377,7 @@ class SystemData:  # pylint: disable=too-few-public-methods
             return ''
 
     def _get_cpu_temp(self) -> float:
-        # BeagleBone Black Temperatur-Sensor
+        # BeagleBone Black temperature sensor
         paths = [
             '/sys/class/thermal/thermal_zone0/temp',
             '/sys/devices/virtual/thermal/thermal_zone0/temp',
@@ -431,10 +431,10 @@ class SystemData:  # pylint: disable=too-few-public-methods
                 return False
 
 
-# ── Zentraler Cache ──────────────────────────────────────────
+# ── Central cache ────────────────────────────────────────────
 
 class DataCache:
-    """Hält alle Daten und aktualisiert sie periodisch."""
+    """Holds all data and refreshes it periodically."""
 
     def __init__(self):
         self.pihole = PiholeStats()
@@ -452,13 +452,13 @@ class DataCache:
         self.unbound = self._unbound_api.fetch()
         self.system = self._system_api.fetch()
         self.last_update = time.time()
-        log.debug('Daten aktualisiert')
+        log.debug('Data refreshed')
 
     def needs_refresh(self) -> bool:
         """Return whether periodic refresh interval has elapsed."""
         return (time.time() - self.last_update) >= config.REFRESH_INTERVAL
 
-    # Aktionen
+    # Actions
     def pihole_set_blocking(self, enable: bool, seconds: int = 0) -> bool:
         """Apply Pi-hole blocking state and update cached Pi-hole stats."""
         ok = self._pihole_api.set_blocking(enable, seconds)

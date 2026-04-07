@@ -29,7 +29,7 @@ K3  (#)      →  P8 Pin 9    GPIO2_5
 K4  (*)      →  P8 Pin 10   GPIO2_4
 ```
 
-**→ Detaillierte Verkabelungsanleitung mit Lochrasterplatine: [docs/WIRING_GUIDE.md](docs/WIRING_GUIDE.md)**
+**-> Detailed wiring guide with perfboard adapter: [docs/WIRING_GUIDE.md](docs/WIRING_GUIDE.md)**
 
 ## Screens
 
@@ -67,13 +67,13 @@ K2 (v)  long   → toggle display sleep
 ### Main screens
 
 - Splash: ![splash](docs/mockups/00_splash.png)
-- Pi-hole active: ![aktiv](docs/mockups/01_pihole_aktiv.png)
-- Pi-hole paused: ![pause](docs/mockups/02_pihole_pause.png)
-- Pi-hole off: ![aus](docs/mockups/03_pihole_aus.png)
+- Pi-hole active: ![active](docs/mockups/01_pihole_aktiv.png)
+- Pi-hole paused: ![paused](docs/mockups/02_pihole_pause.png)
+- Pi-hole off: ![off](docs/mockups/03_pihole_aus.png)
 
 - Unbound: ![unbound](docs/mockups/04_unbound.png)
-- Network: ![netz](docs/mockups/06_netzwerk.png)
-- System: ![sys](docs/mockups/07_system.png)
+- Network: ![network](docs/mockups/06_netzwerk.png)
+- System: ![system](docs/mockups/07_system.png)
 - Status: ![status](docs/mockups/08_status_ok.png)
 
 ### Menus

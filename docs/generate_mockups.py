@@ -2,20 +2,20 @@
 """Generate OLED mockup PNGs for pihole-display documentation."""
 
 # ============================================================
-# generate_mockups.py — Rendert alle OLED-Screens als PNG
-# Zeigt exakt wie das 128x64 Display aussehen wird
-# Ausgabe: mockups/*.png  (4x skaliert = 512x256 px)
+# generate_mockups.py — Render all OLED screens as PNG
+# Shows exactly how the 128x64 display will look
+# Output: mockups/*.png  (4x scale = 512x256 px)
 # ============================================================
 
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-SCALE = 4  # 4x vergrößert für bessere Sichtbarkeit
+SCALE = 4  # 4x enlarged for better readability
 W, H = 128, 64
 SW, SH = W * SCALE, H * SCALE
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ── Fonts ─────────────────────────────────────────────────────
+# ── Fonts ────────────────────────────────────────────────────
 
 
 def load_fonts(scale):
@@ -51,7 +51,8 @@ def load_fonts(scale):
 FONT_SM, FONT_MD, FONT_LG = load_fonts(SCALE)
 
 
-# ── Basis-Renderer ────────────────────────────────────────────
+# ── Base renderer ────────────────────────────────────────────
+
 
 def new_image():
     """Create a new monochrome scaled image and its drawing context."""
@@ -61,7 +62,7 @@ def new_image():
 
 
 def s(v):
-    """Skaliere einen Pixel-Wert."""
+    """Scale a pixel value."""
     return v * SCALE
 
 
@@ -75,9 +76,9 @@ def header(
     """Render the top header with title, status indicator and time."""
 
     dot = '●' if ok else '!'
-    # Titel links, groß
+    # Title on the left, large
     draw.text((s(0), s(0)), title, font=FONT_LG, fill=1)
-    # Status + Zeit rechts, klein — rechts ausgerichtet via getbbox
+    # Status + time on the right, small; right-aligned via getbbox
     right = f'{status} {dot}{time_str}' if status else f'{dot}{time_str}'
     try:
         bbox = FONT_SM.getbbox(right)
@@ -101,49 +102,51 @@ def nav_hint(draw, action: str = ''):
 def save(img, name: str):
     """Save monochrome image as RGB PNG in the docs output directory."""
     path = os.path.join(OUT_DIR, name)
-    # In RGB speichern: weißer Inhalt auf schwarzem Hintergrund.
+    # Save as RGB: white content on black background.
     rgb = Image.new('RGB', (SW, SH), (0, 0, 0))
     rgb.paste((255, 255, 255), mask=img)
     rgb.save(path)
-    print(f'  → {name}')
+    print(f'  -> {name}')
 
 
-# ── Screen 1: Pi-hole Aktiv ───────────────────────────────────
+# ── Screen 1: Pi-hole active ────────────────────────────────
 
-def screen_pihole_aktiv():
+
+def screen_pihole_active():
     """Render screen showing active Pi-hole metrics."""
     img, draw = new_image()
-    header(draw, 'Pi-hole', status='AKTIV', ok=True)
+    header(draw, 'Pi-hole', status='ACTIVE', ok=True)
     draw.text((s(0), s(17)), 'Block:  23.4%', font=FONT_MD, fill=1)
-    draw.text((s(0), s(30)), 'Anfr:    4.821', font=FONT_MD, fill=1)
-    draw.text((s(0), s(43)), 'Clnts:       8', font=FONT_MD, fill=1)
-    nav_hint(draw, 'Menue')
+    draw.text((s(0), s(30)), 'Req:     4,821', font=FONT_MD, fill=1)
+    draw.text((s(0), s(43)), 'Clients:     8', font=FONT_MD, fill=1)
+    nav_hint(draw, 'Menu')
     save(img, '01_pihole_aktiv.png')
 
 
-def screen_pihole_pause():
+def screen_pihole_paused():
     """Render screen showing paused Pi-hole state."""
     img, draw = new_image()
     header(draw, 'Pi-hole', status='PAUSE', ok=False)
-    draw.text((s(0), s(17)), 'Verbl:  14:22', font=FONT_MD, fill=1)
-    draw.text((s(0), s(30)), 'Anfr:    4.821', font=FONT_MD, fill=1)
-    draw.text((s(0), s(43)), 'Clnts:       8', font=FONT_MD, fill=1)
-    nav_hint(draw, 'Menue')
+    draw.text((s(0), s(17)), 'Left:   14:22', font=FONT_MD, fill=1)
+    draw.text((s(0), s(30)), 'Req:     4,821', font=FONT_MD, fill=1)
+    draw.text((s(0), s(43)), 'Clients:     8', font=FONT_MD, fill=1)
+    nav_hint(draw, 'Menu')
     save(img, '02_pihole_pause.png')
 
 
-def screen_pihole_aus():
+def screen_pihole_off():
     """Render screen showing disabled Pi-hole state."""
     img, draw = new_image()
-    header(draw, 'Pi-hole', status='AUS', ok=False)
+    header(draw, 'Pi-hole', status='OFF', ok=False)
     draw.text((s(0), s(17)), 'Block:   0.0%', font=FONT_MD, fill=1)
-    draw.text((s(0), s(30)), 'Anfr:    4.821', font=FONT_MD, fill=1)
-    draw.text((s(0), s(43)), 'Clnts:       8', font=FONT_MD, fill=1)
-    nav_hint(draw, 'Menue')
+    draw.text((s(0), s(30)), 'Req:     4,821', font=FONT_MD, fill=1)
+    draw.text((s(0), s(43)), 'Clients:     8', font=FONT_MD, fill=1)
+    nav_hint(draw, 'Menu')
     save(img, '03_pihole_aus.png')
 
 
-# ── Screen 2: Unbound ─────────────────────────────────────────
+# ── Screen 2: Unbound ───────────────────────────────────────
+
 
 def screen_unbound():
     """Render Unbound runtime statistics screen."""
@@ -151,35 +154,37 @@ def screen_unbound():
     header(draw, 'Unbound', status='OK', ok=True)
     draw.text((s(0), s(17)), 'Cache:  67.2%', font=FONT_MD, fill=1)
     draw.text((s(0), s(30)), 'Q/s:      4.1', font=FONT_MD, fill=1)
-    draw.text((s(0), s(43)), 'Ges:   12.847', font=FONT_MD, fill=1)
+    draw.text((s(0), s(43)), 'Total: 12,847', font=FONT_MD, fill=1)
     nav_hint(draw, 'Flush')
     save(img, '04_unbound.png')
 
 
-def screen_unbound_fehler():
+def screen_unbound_error():
     """Render Unbound error status screen."""
     img, draw = new_image()
-    header(draw, 'Unbound', status='FEHLER', ok=False)
-    draw.text((s(0), s(17)), 'Fehler: nicht aktiv', font=FONT_SM, fill=1)
-    nav_hint(draw, 'Neustart')
+    header(draw, 'Unbound', status='ERROR', ok=False)
+    draw.text((s(0), s(17)), 'Error: not active', font=FONT_SM, fill=1)
+    nav_hint(draw, 'Restart')
     save(img, '05_unbound_fehler.png')
 
 
-# ── Screen 3: Netzwerk ────────────────────────────────────────
+# ── Screen 3: Network ───────────────────────────────────────
+
 
 def screen_network():
     """Render network information screen."""
     img, draw = new_image()
-    header(draw, 'Netzwerk', ok=True)
+    header(draw, 'Network', ok=True)
     draw.text((s(0), s(16)), 'IP:   192.168.1.10', font=FONT_SM, fill=1)
     draw.text((s(0), s(26)), 'GW:   192.168.1.1',  font=FONT_SM, fill=1)
     draw.text((s(0), s(36)), 'Host: beaglebone',   font=FONT_SM, fill=1)
-    draw.text((s(0), s(44)), 'Up:   3T 14:22',     font=FONT_SM, fill=1)
+    draw.text((s(0), s(44)), 'Up:   3d 14:22',     font=FONT_SM, fill=1)
     nav_hint(draw)
     save(img, '06_netzwerk.png')
 
 
-# ── Screen 4: System ──────────────────────────────────────────
+# ── Screen 4: System ────────────────────────────────────────
+
 
 def screen_system():
     """Render system metrics screen (CPU, RAM, disk)."""
@@ -192,7 +197,8 @@ def screen_system():
     save(img, '07_system.png')
 
 
-# ── Screen 5: Status ──────────────────────────────────────────
+# ── Screen 5: Status ────────────────────────────────────────
+
 
 def screen_status_ok():
     """Render overall status screen with all services healthy."""
@@ -201,89 +207,92 @@ def screen_status_ok():
     draw.text((s(0), s(17)), '[OK] Pi-hole ', font=FONT_SM, fill=1)
     draw.text((s(0), s(28)), '[OK] Unbound ', font=FONT_SM, fill=1)
     draw.text((s(0), s(39)), '[OK] DNS     ', font=FONT_SM, fill=1)
-    nav_hint(draw, 'Aktionen')
+    nav_hint(draw, 'Actions')
     save(img, '08_status_ok.png')
 
 
-def screen_status_fehler():
+def screen_status_error():
     """Render overall status screen with at least one service failure."""
     img, draw = new_image()
     header(draw, 'Status', ok=False)
     draw.text((s(0), s(17)), '[OK] Pi-hole ', font=FONT_SM, fill=1)
     draw.text((s(0), s(28)), '[!!] Unbound ', font=FONT_SM, fill=1)
     draw.text((s(0), s(39)), '[OK] DNS     ', font=FONT_SM, fill=1)
-    nav_hint(draw, 'Aktionen')
+    nav_hint(draw, 'Actions')
     save(img, '09_status_fehler.png')
 
 
-# ── Menü: Pi-hole (aktiv) ─────────────────────────────────────
+# ── Menu: Pi-hole (active) ──────────────────────────────────
+
 
 def _menu_block(draw, title_count: str, items_3: list):
-    """Hilfsfunktion: 3 Items + Scroll-Zähler + Nav-Leiste."""
-    draw.text((s(0), s(0)),   'Aktion:', font=FONT_SM, fill=1)
+    """Helper: 3 items + scroll counter + nav bar."""
+    draw.text((s(0), s(0)), 'Action:', font=FONT_SM, fill=1)
     draw.text((s(45), s(0)), title_count, font=FONT_SM, fill=1)
     draw.line([(s(0), s(10)), (s(W), s(10))], fill=1, width=SCALE)
     for i, label in enumerate(items_3):
         draw.text((s(0), s(13 + i * 13)), label, font=FONT_SM, fill=1)
     draw.line([(s(0), s(H - 10)), (s(W), s(H - 10))], fill=1, width=SCALE)
-    nav_text = '[^][v] Nav  [#]OK  [*]Abbr'
+    nav_text = '[^][v] Nav  [#]OK  [*]Back'
     draw.text((s(0), s(H - 9)), nav_text, font=FONT_SM, fill=1)
 
 
-def menu_pihole_aktiv():
+def menu_pihole_active():
     """Render first page of the Pi-hole active-state action menu."""
     img, draw = new_image()
     _menu_block(draw, '1/6', [
-        '> Pause 5 Min',
-        '  Pause 15 Min',
-        '  Pause 30 Min',
+        '> Pause 5 min',
+        '  Pause 15 min',
+        '  Pause 30 min',
     ])
     save(img, '10_menu_pihole_aktiv.png')
 
 
-def menu_pihole_aktiv2():
+def menu_pihole_active2():
     """Render scrolled page of the Pi-hole active-state action menu."""
     img, draw = new_image()
     _menu_block(draw, '4/6', [
-        '  Pause 1 Std',
-        '  Deaktivieren',
-        '> Gravity Upd.',
+        '  Pause 1 hour',
+        '  Disable',
+        '> Gravity upd.',
     ])
     save(img, '11_menu_pihole_scroll.png')
 
 
-def menu_pihole_aus():
+def menu_pihole_off():
     """Render Pi-hole disabled-state action menu."""
     img, draw = new_image()
     _menu_block(draw, '1/3', [
-        '> Aktivieren',
-        '  Gravity Upd.',
-        '  DNS Cache leer',
+        '> Enable',
+        '  Gravity upd.',
+        '  Clear DNS cache',
     ])
     save(img, '12_menu_pihole_aus.png')
 
 
-# ── Menü: Unbound ─────────────────────────────────────────────
+# ── Menu: Unbound ───────────────────────────────────────────
+
 
 def menu_unbound():
     """Render Unbound action menu."""
     img, draw = new_image()
     _menu_block(draw, '1/2', [
-        '> Cache leeren',
-        '  Neustart',
+        '> Clear cache',
+        '  Restart',
     ])
     save(img, '13_menu_unbound.png')
 
 
-# ── Menü: Status / Aktionen ───────────────────────────────────
+# ── Menu: Status / Actions ──────────────────────────────────
+
 
 def menu_status():
     """Render first page of generic status actions menu."""
     img, draw = new_image()
     _menu_block(draw, '1/4', [
-        '> Pi-hole Neustart',
-        '  Unbound Neustart',
-        '  Alles Neustart',
+        '> Restart Pi-hole',
+        '  Restart Unbound',
+        '  Restart all',
     ])
     save(img, '14_menu_status.png')
 
@@ -292,13 +301,14 @@ def menu_status2():
     """Render scrolled page of generic status actions menu."""
     img, draw = new_image()
     _menu_block(draw, '4/4', [
-        '  Alles Neustart',
-        '> Aktualisieren',
+        '  Restart all',
+        '> Refresh data',
     ])
     save(img, '14b_menu_status_scroll.png')
 
 
-# ── Nachrichten ───────────────────────────────────────────────
+# ── Messages ────────────────────────────────────────────────
+
 
 def message(text: str, filename: str):
     """Render a centered multiline message screen and save it."""
@@ -320,7 +330,7 @@ def message(text: str, filename: str):
 def screen_sleep():
     """Render a fully black screen representing OLED sleep mode."""
     img = Image.new('1', (SW, SH), 0)
-    # Komplett schwarz = Display aus
+    # Fully black = display off
     save(img, '20_sleep.png')
 
 
@@ -331,43 +341,43 @@ def screen_splash():
     draw.line([(s(10), s(22)), (s(W - 10), s(22))], fill=1, width=SCALE)
     draw.text((s(15), s(26)), 'BeagleBone Black', font=FONT_SM, fill=1)
     draw.text((s(25), s(37)), 'Pi-hole + Unbound', font=FONT_SM, fill=1)
-    draw.text((s(35), s(50)), 'Lade Daten...', font=FONT_SM, fill=1)
+    draw.text((s(35), s(50)), 'Loading data...', font=FONT_SM, fill=1)
     save(img, '00_splash.png')
 
 
-# ── Main ──────────────────────────────────────────────────────
+# ── Main ────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    print(f'Rendere Mockups nach: {OUT_DIR}')
+    print(f'Rendering mockups to: {OUT_DIR}')
     print()
 
     print('--- Screens ---')
     screen_splash()
-    screen_pihole_aktiv()
-    screen_pihole_pause()
-    screen_pihole_aus()
+    screen_pihole_active()
+    screen_pihole_paused()
+    screen_pihole_off()
     screen_unbound()
-    screen_unbound_fehler()
+    screen_unbound_error()
     screen_network()
     screen_system()
     screen_status_ok()
-    screen_status_fehler()
+    screen_status_error()
 
     print('--- Menus ---')
-    menu_pihole_aktiv()
-    menu_pihole_aktiv2()
-    menu_pihole_aus()
+    menu_pihole_active()
+    menu_pihole_active2()
+    menu_pihole_off()
     menu_unbound()
     menu_status()
     menu_status2()
 
-    print('--- Nachrichten ---')
-    message('Pi-hole\nPause 15 Min...', '15_msg_pause.png')
-    message('Pi-hole\nAKTIV', '16_msg_aktiv.png')
-    message('Pi-hole\nAUS', '17_msg_aus.png')
-    message('Cache\ngeleert', '18_msg_flush.png')
-    message('Gravity\nUpdate...\n(dauert!)', '19_msg_gravity.png')
+    print('--- Messages ---')
+    message('Pi-hole\nPause 15 min...', '15_msg_pause.png')
+    message('Pi-hole\nACTIVE', '16_msg_aktiv.png')
+    message('Pi-hole\nOFF', '17_msg_aus.png')
+    message('Cache\ncleared', '18_msg_flush.png')
+    message('Gravity\nupdate...\n(takes time!)', '19_msg_gravity.png')
     screen_sleep()
 
     print()
-    print(f'Fertig! {len(os.listdir(OUT_DIR))} Dateien in {OUT_DIR}')
+    print(f'Done! {len(os.listdir(OUT_DIR))} files in {OUT_DIR}')

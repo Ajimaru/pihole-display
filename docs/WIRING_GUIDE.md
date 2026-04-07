@@ -1,40 +1,40 @@
-# Verkabelungsanleitung: pihole-display mit DIY Lochraster-Adapterplatine
+# Wiring Guide: pihole-display with a DIY Perfboard Adapter
 
-Diese Anleitung erklärt die korrekte Verkabelung des OLED-Displays und der 4 Buttons auf einer selbstgebauten Lochrasterplatine, die zwischen den BeagleBone Black (BBB) Headern P8 und P9 steckt.
+This guide explains how to correctly wire the OLED display and the 4 buttons on a homemade perfboard adapter that sits between the BeagleBone Black (BBB) P8 and P9 headers.
 
-## DIY Lochraster-Adapterplatine
+## DIY Perfboard Adapter
 
-### Materialliste
+### Bill of Materials
 
-| Bauteil | Menge | Preis ca. |
+| Part | Qty | Approx. price |
 | --- | --- | --- |
-| Lochrasterplatine 2.54mm | 1× (min. 12×6 Löcher) | ~0.50€ |
-| 1×8 Stiftleiste (männlich) | 1× | ~0.20€ |
-| Einzelne Female Dupont Crimp-Pins + Kabel | 8× je ~10cm | ~1€ |
-| Lötdraht (Ø 0.5mm) | 1 Rolle | ~2€ |
-| **Gesamt** | **~4€** | |
+| 2.54mm perfboard | 1x (min. 12x6 holes) | ~0.50 EUR |
+| 1x8 pin header (male) | 1x | ~0.20 EUR |
+| Single female Dupont crimp pins + wire | 8x, about 10cm each | ~1 EUR |
+| Solder wire (0.5mm) | 1 roll | ~2 EUR |
+| **Total** | **~4 EUR** | |
 
 ```text
 BeagleBone Black
-├── P8 Header (links)  ──┐
-│                        ├──[Lochrasterplatine]──┐
-└── P9 Header (rechts) ──┘                        │
-                                                  ├── OLED Display (SSD1315)
-                                                  ├── Button K1 (nach oben)
-                                                  ├── Button K2 (nach unten)
-                                                  ├── Button K3 (Select/Enter)
-                                                  └── Button K4 (Home/Cancel)
+├── P8 header (left)   ──┐
+│                        ├──[Perfboard adapter]──┐
+└── P9 header (right) ──┘                        │
+                                                  ├── OLED display (SSD1315)
+                                                  ├── Button K1 (up)
+                                                  ├── Button K2 (down)
+                                                  ├── Button K3 (select/enter)
+                                                  └── Button K4 (home/cancel)
 ```
 
-## Material
+## Materials
 
-- BeagleBone Black mit Debian 13 Trixie
-- 0.96" OLED Display SSD1315 (128×64 Pixel, I2C)
-- 4× Tactile Push Buttons (z. B. 6mm × 6mm)
-- Lochrasterplatine (2.54mm Raster, min. 12×6 Löcher)
-- 1×8 Stiftleiste (männlich) für Display-Anschluss
+- BeagleBone Black with Debian 13 Trixie
+- 0.96" OLED display SSD1315 (128x64 pixels, I2C)
+- 4x tactile push buttons (for example 6mm x 6mm)
+- Perfboard (2.54mm grid, min. 12x6 holes)
+- 1x8 pin header (male) for the display connector
 
-## BeagleBone Black Header — Pinouts
+## BeagleBone Black Headers - Pinouts
 
 <!-- markdownlint-disable MD033 -->
 <table>
@@ -65,71 +65,71 @@ BeagleBone Black
 </table>
 <!-- markdownlint-enable MD033 -->
 
-## Detailliertes Verkabelungs-Schaltschema
+## Detailed Wiring Schematic
 
 ```text
-P9 Header (links)           Lochrasterplatine                P8 Header (rechts)
-┌──────────────┐            ┌──────────────────────┐        ┌──────────────┐
-│ Pin 1 (GND)  ├────────────┤ GND Sammelschiene    ├────────┤ Pin 1 (GND)  │
-│ Pin 2 (GND)  ├────────────┤        ↓             ├────────┤ Pin 2 (GND)  │
-│ Pin 3 (3.3V) ├────────────┤        |             │        │              │
-│ Pin 19(SCL)  ├────────────┤        |             │        │              │
-│ Pin 20(SDA)  ├────────────┤        |             │        │              │
-│              │            │        |             │        │              │
-└──────────────┘            │        |             │        │              │
-                            │ 3.3V Sammelschiene   ├────────┤              │
-                            │        ↑             │        │              │
-                            │   Pull-up Res.       │        │              │
-                            │              │       │        │              │
-                            │  Display     │       │        │              │
-                            │  (I2C SSD1315)       │        │              │
-                            │  VCC ────────|       │        │              │
-                            │  GND ────────|       │        │              │
-                            │  K1  ────────────────┤────────┤ Pin 7 (GPIO) │
-                            │  K2  ────────────────┤────────┤ Pin 8 (GPIO) │
-                            │  K3  ────────────────┤────────┤ Pin 9 (GPIO) │
-                            │  K4  ────────────────┤────────┤ Pin 10(GPIO) │
-                            └──────────────────────┘        └──────────────┘
+P9 header (left)            Perfboard adapter                 P8 header (right)
+┌──────────────┐            ┌──────────────────────┐         ┌──────────────┐
+│ Pin 1 (GND)  ├────────────┤ GND bus rail         ├─────────┤ Pin 1 (GND)  │
+│ Pin 2 (GND)  ├────────────┤        ↓             ├─────────┤ Pin 2 (GND)  │
+│ Pin 3 (3.3V) ├────────────┤        |             │         │              │
+│ Pin 19(SCL)  ├────────────┤        |             │         │              │
+│ Pin 20(SDA)  ├────────────┤        |             │         │              │
+│              │            │        |             │         │              │
+└──────────────┘            │        |             │         │              │
+                            │ 3.3V bus rail        ├─────────┤              │
+                            │        ↑             │         │              │
+                            │   Pull-up resistor   │         │              │
+                            │              │       │         │              │
+                            │  Display     │       │         │              │
+                            │  (I2C SSD1315)       │         │              │
+                            │  VCC ────────|       │         │              │
+                            │  GND ────────|       │         │              │
+                            │  K1  ────────────────┤─────────┤ Pin 7 (GPIO) │
+                            │  K2  ────────────────┤─────────┤ Pin 8 (GPIO) │
+                            │  K3  ────────────────┤─────────┤ Pin 9 (GPIO) │
+                            │  K4  ────────────────┤─────────┤ Pin 10(GPIO) │
+                            └──────────────────────┘         └──────────────┘
 ```
 
-## Verifikation nach Verbindung
+## Verification After Wiring
 
-Nach der Verkabelung folgende Schritte durchführen:
+After wiring is complete, run the following checks:
 
 ```bash
-# 1. SSH auf BBB
+# 1. SSH to BBB
 ssh root@beaglebone
 
-# 2. I2C-Display prüfen (sollte 0x3C oder 0x3D zeigen)
+# 2. Check I2C display (should show 0x3C or 0x3D)
 i2cdetect -y -r 2
 
-# 3. GPIO-Pins prüfen (sollte GPIO2_2 bis GPIO2_5 anzeigen)
+# 3. Check GPIO pins (should include GPIO2_2 to GPIO2_5)
 ls /sys/class/gpio/
 
-# 4. Buttons testen (vor Installation)
+# 4. Test buttons (before installation)
 cd /tmp/pihole-display
 python3 button_handler.py
 
-# 5. Display testen
+# 5. Test display
 python3 display_manager.py
 ```
 
-## Fehlerbehebung
+## Troubleshooting
 
-- **I2C-Display wird nicht erkannt**
-  - Ursache: SCL/SDA vertauscht oder nicht verbunden
-  - Lösung: Pinbelegung überprüfen, Durchgang messen
-- **Buttons reagieren nicht**
-  - Ursache: GPIO-Pin nicht verbunden oder falscher Pin
-  - Lösung: Verkabelung gegen Diagramm überprüfen
-- **Display flackert**
-  - Ursache: Unzureichende Stromversorgung
-  - Lösung: 3.3V Leitung überprüfen, dickere Drähte verwenden
-- **Lötbrücke suspekt**
-  - Ursache: Kalte Lötstelle
-  - Lösung: Mit Lötkolben nacharbeiten
+- **I2C display is not detected**
+  - Cause: SCL/SDA swapped or not connected
+  - Fix: Verify pin mapping and continuity
+- **Buttons do not respond**
+  - Cause: GPIO pin not connected or wrong pin used
+  - Fix: Verify wiring against the diagram
+- **Display flickers**
+  - Cause: Insufficient power supply stability
+  - Fix: Verify 3.3V line, use thicker wires
+- **Suspicious solder joint**
+  - Cause: Cold solder joint
+  - Fix: Rework with soldering iron
 
-## Referenzen
+## References
 
-- BeagleBone Black P8/P9 Header: [BeagleBone Black System Reference Manual](https://www.beagleboard.org/support/bone101/)
-- SSD1315 OLED Driver: [SSD1315 Datasheet](https://cdn-shop.adafruit.com/datasheets/SSD1315.pdf)
+- BeagleBone Black P8/P9 headers: [BeagleBone Black System Reference Manual](https://www.beagleboard.org/support/bone101/)
+- SSD1315 OLED driver: [SSD1315 Datasheet](https://cdn-shop.adafruit.com/datasheets/SSD1315.pdf)

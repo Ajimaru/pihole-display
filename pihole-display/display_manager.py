@@ -1,8 +1,8 @@
 """Render and manage OLED UI screens, menus, and transient messages."""
 
 # ============================================================
-# display_manager.py — OLED Screen-Rendering (luma.oled)
-# SSD1315 / SSD1306 kompatibel, 128x64 Pixel
+# display_manager.py — OLED screen rendering (luma.oled)
+# SSD1315 / SSD1306 compatible, 128x64 pixels
 # ============================================================
 
 import time
@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 # ── Fonts ─────────────────────────────────────────────────────
 
 try:
-    # Besserer Font falls vorhanden
+    # Better font if available
     _FONT_SM = ImageFont.truetype(
         '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',
         9,
@@ -42,7 +42,7 @@ except OSError:
     _FONT_LG = ImageFont.load_default()
 
 
-# ── Screen-Definitionen ──────────────────────────────────────
+# ── Screen definitions ───────────────────────────────────────
 
 class Screen(Enum):
     """Logical top-level screens shown in normal UI mode."""
@@ -57,7 +57,7 @@ class Screen(Enum):
 SCREEN_NAMES = {
     Screen.PIHOLE:  'Pi-hole',
     Screen.UNBOUND: 'Unbound',
-    Screen.NETWORK: 'Netzwerk',
+    Screen.NETWORK: 'Network',
     Screen.SYSTEM:  'System',
     Screen.STATUS:  'Status',
 }
@@ -74,14 +74,14 @@ SCREEN_ORDER = [
 class UIMode(Enum):
     """UI state machine modes for screen, menu, message, and sleep."""
 
-    NORMAL = auto()   # Screen-Anzeige
-    MENU = auto()   # Aktions-Menü
-    CONFIRM = auto()   # Bestätigungs-Dialog
-    MESSAGE = auto()   # Kurze Statusmeldung
-    SLEEP = auto()   # Display schläft
+    NORMAL = auto()   # Screen view
+    MENU = auto()   # Action menu
+    CONFIRM = auto()   # Confirmation dialog
+    MESSAGE = auto()   # Short status message
+    SLEEP = auto()   # Display sleeping
 
 
-# ── Display-Manager ──────────────────────────────────────────
+# ── Display manager ──────────────────────────────────────────
 
 class DisplayManager:  # pylint: disable=too-many-instance-attributes
     """Coordinate OLED rendering and UI navigation state."""
@@ -107,16 +107,16 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             serial = i2c(port=config.I2C_PORT, address=config.I2C_ADDRESS)
             device = ssd1306(serial, width=self.W, height=self.H)
             log.info(
-                'OLED initialisiert auf I2C%d @ 0x%02X',
+                'OLED initialized on I2C%d @ 0x%02X',
                 config.I2C_PORT,
                 config.I2C_ADDRESS,
             )
             return device
         except Exception as e:
-            log.error('OLED Initialisierung fehlgeschlagen: %s', e)
+            log.error('OLED initialization failed: %s', e)
             raise
 
-    # ── Öffentliche API ──────────────────────────────────────
+    # ── Public API ───────────────────────────────────────────
 
     @property
     def current_screen(self) -> Screen:
@@ -195,7 +195,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             self._device.hide()
 
     def update(self):
-        """Hauptrender-Schleife, regelmäßig aufrufen."""
+        """Main render loop, call periodically."""
         now = time.monotonic()
 
         if self._enter_sleep_on_timeout(now):
@@ -243,7 +243,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             self._mode = UIMode.NORMAL
             self._device.show()
 
-    # ── Screen-Renderer ──────────────────────────────────────
+    # ── Screen renderer ──────────────────────────────────────
 
     def _render_screen(self, draw):
         screen = SCREEN_ORDER[self._screen_idx]
@@ -256,18 +256,18 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         }[screen](draw)
 
     def _header(self, draw, title: str, status: str = '', ok: bool = True):
-        """Kopfzeile: Titel (LG, links) + Status+Zeit (SM, rechts)."""
+        """Header row: title (LG, left) + status/time (SM, right)."""
         now = time.strftime('%H:%M')
         dot = '\u25CF' if ok else '!'
         draw.text((0, 0), title, font=_FONT_LG, fill='white')
         right = f'{status} {dot}{now}' if status else f'{dot}{now}'
-        # Rechts ausrichten: ~6px pro Zeichen bei FONT_SM
+        # Right align: ~6px per character with FONT_SM
         rx = max(0, self.W - len(right) * 6)
         draw.text((rx, 3), right, font=_FONT_SM, fill='white')
         draw.line([(0, 14), (self.W, 14)], fill='white', width=1)
 
     def _nav_hint(self, draw, action_label: str = ''):
-        """Untere Navigation: ^ Screen v  [#]Aktion"""
+        """Bottom navigation: ^ Screen v  [#]Action"""
         y = self.H - 10
         draw.line([(0, y - 1), (self.W, y - 1)], fill='white', width=1)
         hint = '[^][v] Screen'
@@ -284,16 +284,16 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             secs = ph.pause_remaining % 60
             status = 'PAUSE'
         elif ph.enabled:
-            status = 'AKTIV'
+            status = 'ACTIVE'
         else:
-            status = 'AUS'
+            status = 'OFF'
 
         self._header(draw, 'Pi-hole', status, ok)
 
         if ph.error:
             draw.text(
                 (0, 17),
-                'Fehler: ' + ph.error[:18],
+                'Error: ' + ph.error[:18],
                 font=_FONT_SM,
                 fill='white',
             )
@@ -302,19 +302,19 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             secs = ph.pause_remaining % 60
             draw.text(
                 (0, 17),
-                f'Verbl: {mins:02d}:{secs:02d}',
+                f'Left:  {mins:02d}:{secs:02d}',
                 font=_FONT_MD,
                 fill='white',
             )
             draw.text(
                 (0, 30),
-                f'Anfr:  {ph.queries_today:>7,}',
+                f'Req:   {ph.queries_today:>7,}',
                 font=_FONT_MD,
                 fill='white',
             )
             draw.text(
                 (0, 43),
-                f'Clnts: {ph.clients:>7}',
+                f'Clients:{ph.clients:>6}',
                 font=_FONT_MD,
                 fill='white',
             )
@@ -327,18 +327,18 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             )
             draw.text(
                 (0, 30),
-                f'Anfr:  {ph.queries_today:>7,}',
+                f'Req:   {ph.queries_today:>7,}',
                 font=_FONT_MD,
                 fill='white',
             )
             draw.text(
                 (0, 43),
-                f'Clnts: {ph.clients:>7}',
+                f'Clients:{ph.clients:>6}',
                 font=_FONT_MD,
                 fill='white',
             )
 
-        self._nav_hint(draw, 'Menü')
+        self._nav_hint(draw, 'Menu')
 
     def _screen_unbound(self, draw):
         ub = self._data.unbound
@@ -349,7 +349,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         if ub.error:
             draw.text(
                 (0, 17),
-                'Fehler: ' + ub.error[:18],
+                'Error: ' + ub.error[:18],
                 font=_FONT_SM,
                 fill='white',
             )
@@ -368,7 +368,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             )
             draw.text(
                 (0, 43),
-                f'Ges:   {ub.queries_total:>7,}',
+                f'Total: {ub.queries_total:>7,}',
                 font=_FONT_MD,
                 fill='white',
             )
@@ -377,7 +377,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
 
     def _screen_network(self, draw):
         sy = self._data.system
-        self._header(draw, 'Netzwerk', '', True)
+        self._header(draw, 'Network', '', True)
         draw.text(
             (0, 16),
             f'IP:   {sy.ip_address}',
@@ -433,13 +433,13 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         row(17, 'Pi-hole ', sy.pihole_ok)
         row(28, 'Unbound ', sy.unbound_ok)
         row(39, 'DNS     ', sy.dns_ok)
-        self._nav_hint(draw, 'Aktionen')
+        self._nav_hint(draw, 'Actions')
 
-    # ── Menü-Renderer ────────────────────────────────────────
+    # ── Menu renderer ────────────────────────────────────────
 
     def _render_menu(self, draw):
-        draw.text((0, 0), 'Aktion:', font=_FONT_SM, fill='white')
-        # Scroll-Indikator
+        draw.text((0, 0), 'Action:', font=_FONT_SM, fill='white')
+        # Scroll indicator
         total = len(self._menu_items)
         draw.text(
             (45, 0),
@@ -449,7 +449,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         )
         draw.line([(0, 10), (self.W, 10)], fill='white', width=1)
 
-        visible = 3   # 3 Items = kein Überlauf in Nav-Zeile
+        visible = 3   # 3 items = no overflow in nav row
         start = max(0, self._menu_sel - visible + 1)
         visible_items = self._menu_items[start:start + visible]
         for i, (label, _) in enumerate(visible_items):
@@ -465,12 +465,12 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         )
         draw.text(
             (0, self.H - 9),
-            '[^][v] Nav  [#]OK  [*]Abbr',
+            '[^][v] Nav  [#]OK  [*]Back',
             font=_FONT_SM,
             fill='white',
         )
 
-    # ── Nachrichten-Renderer ─────────────────────────────────
+    # ── Message renderer ─────────────────────────────────────
 
     def _render_message(self, draw):
         """Render the active multiline message centered on screen."""
@@ -478,7 +478,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         y = max(0, (self.H - len(lines) * 14) // 2)
         for line in lines:
             w = self.W
-            # Zentrieren
+            # Center text
             try:
                 bbox = _FONT_MD.getbbox(line)
                 tw = bbox[2] - bbox[0]

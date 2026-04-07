@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# install.sh — Installation pihole-display auf BeagleBone Black
+# install.sh — Install pihole-display on BeagleBone Black
 # Debian 13 (Trixie)
 # ============================================================
 set -e
@@ -11,14 +11,14 @@ SERVICE="pihole-display"
 echo "=== pihole-display Installation ==="
 echo ""
 
-# Root-Check
+# Root check
 if [ "$EUID" -ne 0 ]; then
-    echo "Bitte als root ausführen: sudo ./install.sh"
+    echo "Please run as root: sudo ./install.sh"
     exit 1
 fi
 
-# Abhängigkeiten (System)
-echo "[1/5] System-Pakete installieren..."
+# Dependencies (system)
+echo "[1/5] Installing system packages..."
 apt-get update -qq
 apt-get install -y \
     python3 \
@@ -31,47 +31,47 @@ apt-get install -y \
     fonts-dejavu-core \
     --no-install-recommends
 
-# I2C aktivieren
-echo "[2/5] I2C aktivieren..."
+# Enable I2C
+echo "[2/5] Enabling I2C..."
 if ! grep -q "^dtparam=i2c_arm=on" /boot/uEnv.txt 2>/dev/null; then
-    # BeagleBone nutzt uEnv.txt oder cape-overlays
-    echo "Hinweis: Bitte sicherstellen dass I2C2 im Device Tree aktiviert ist."
-    echo "  Prüfe mit: ls /dev/i2c*"
+    # BeagleBone uses uEnv.txt or cape overlays
+    echo "Note: Make sure I2C2 is enabled in the device tree."
+    echo "  Check with: ls /dev/i2c*"
 fi
 
-# Verzeichnis anlegen
-echo "[3/5] Installationsverzeichnis erstellen: $INSTALL_DIR"
+# Create installation directory
+echo "[3/5] Creating installation directory: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 cp -r ./* "$INSTALL_DIR/"
 
 # Python Virtual Environment
-echo "[4/5] Python venv und Pakete installieren..."
+echo "[4/5] Installing Python venv and packages..."
 python3 -m venv "$INSTALL_DIR/venv"
 "$INSTALL_DIR/venv/bin/pip" install --upgrade pip -q
 "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt" -q
 
-# Systemd-Service
-echo "[5/5] Systemd-Service installieren..."
+# Systemd service
+echo "[5/5] Installing systemd service..."
 cp "$INSTALL_DIR/pihole-display.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable "$SERVICE"
 
 echo ""
-echo "=== Installation abgeschlossen ==="
+echo "=== Installation complete ==="
 echo ""
-echo "Nächste Schritte:"
+echo "Next steps:"
 echo ""
-echo "1. I2C prüfen (Display angeschlossen?):"
+echo "1. Check I2C (is the display connected?):"
 echo "   i2cdetect -y -r 2"
-echo "   → Adresse 0x3C oder 0x3D sollte erscheinen"
+echo "   -> Address 0x3C or 0x3D should appear"
 echo ""
-echo "2. (Optional) Pi-hole v6 Passwort in config.py eintragen:"
+echo "2. (Optional) Set Pi-hole v6 password in config.py:"
 echo "   nano $INSTALL_DIR/config.py"
-echo "   → PIHOLE_PASSWORD = 'dein-passwort'"
+echo "   -> PIHOLE_PASSWORD = 'your-password'"
 echo ""
-echo "3. Service starten:"
+echo "3. Start service:"
 echo "   systemctl start $SERVICE"
 echo ""
-echo "4. Logs anzeigen:"
+echo "4. Show logs:"
 echo "   journalctl -u $SERVICE -f"
 echo ""

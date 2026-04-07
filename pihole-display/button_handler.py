@@ -1,9 +1,9 @@
 """Handle GPIO button input and map presses to UI button events."""
 
 # ============================================================
-# button_handler.py — GPIO Buttons via gpiod v2
-# BeagleBone Black: gpiochip2, Pins 2/3/4/5
-# Alle Buttons: Active-LOW (4.7K Pull-up auf Platine)
+# button_handler.py — GPIO buttons via gpiod v2
+# BeagleBone Black: gpiochip2, pins 2/3/4/5
+# All buttons: active-low (4.7K pull-up on board)
 # ============================================================
 
 import threading
@@ -28,21 +28,21 @@ log = logging.getLogger(__name__)
 class ButtonEvent(Enum):
     """Logical button events for short and long presses."""
 
-    UP_SHORT = auto()   # ^ kurz
-    UP_LONG = auto()   # ^ lang
-    DOWN_SHORT = auto()   # v kurz
-    DOWN_LONG = auto()   # v lang
-    OK_SHORT = auto()   # # kurz
-    OK_LONG = auto()   # # lang
-    BACK_SHORT = auto()   # * kurz
-    BACK_LONG = auto()   # * lang  → Home
+    UP_SHORT = auto()   # ^ short
+    UP_LONG = auto()   # ^ long
+    DOWN_SHORT = auto()   # v short
+    DOWN_LONG = auto()   # v long
+    OK_SHORT = auto()   # # short
+    OK_LONG = auto()   # # long
+    BACK_SHORT = auto()   # * short
+    BACK_LONG = auto()   # * long -> Home
 
 
 class ButtonHandler:
     """
-    Liest 4 GPIO-Tasten via gpiod v2 (Debian 13).
-    Erkennt kurzen und langen Druck.
-    Ruft callback(event: ButtonEvent) auf.
+    Reads 4 GPIO buttons via gpiod v2 (Debian 13).
+    Detects short and long presses.
+    Calls callback(event: ButtonEvent).
     """
 
     _PINS = {
@@ -63,7 +63,7 @@ class ButtonHandler:
         self._running = True
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
-        log.info('Button-Handler gestartet')
+        log.info('Button handler started')
 
     def stop(self):
         """Stop polling and release any claimed GPIO resources."""
@@ -75,20 +75,20 @@ class ButtonHandler:
                 pass
         if self._thread:
             self._thread.join(timeout=2)
-        log.info('Button-Handler gestoppt')
+        log.info('Button handler stopped')
 
     def _poll_loop(self):
         try:
             self._poll_with_gpiod()
         except (ImportError, OSError, RuntimeError) as e:
-            log.error('gpiod Fehler: %s — Fallback auf sysfs', e)
+            log.error('gpiod error: %s - falling back to sysfs', e)
             self._poll_with_sysfs()
 
     # ── gpiod v2 ─────────────────────────────────────────────
 
     def _poll_with_gpiod(self):  # pylint: disable=too-many-locals
         if gpiod is None or Direction is None or Value is None:
-            raise ImportError('gpiod nicht verfügbar')
+            raise ImportError('gpiod not available')
 
         pins = list(self._PINS.values())
         names = list(self._PINS.keys())
@@ -102,13 +102,13 @@ class ButtonHandler:
             config=config_map
         )
 
-        # Zustand: {pin: (pressed_since_ts or None)}
+        # State: {pin: (pressed_since_ts or None)}
         pressed_since = {p: None for p in pins}
-        # HIGH = nicht gedrückt
+        # HIGH = not pressed
         last_state = {p: Value.ACTIVE for p in pins}
         debounce_end = {p: 0.0 for p in pins}
 
-        log.info('gpiod Polling aktiv auf %s, Pins %s', config.GPIO_CHIP, pins)
+        log.info('gpiod polling active on %s, pins %s', config.GPIO_CHIP, pins)
 
         while self._running:
             now = time.monotonic()
@@ -116,7 +116,7 @@ class ButtonHandler:
 
             for i, pin in enumerate(pins):
                 val = vals[i]
-                pressed = val == Value.INACTIVE   # LOW = gedrückt
+                pressed = val == Value.INACTIVE   # LOW = pressed
                 was_pressed = last_state[pin] == Value.INACTIVE
                 self._process_button_transition(
                     key=pin,
@@ -130,15 +130,15 @@ class ButtonHandler:
                     pressed_since=pressed_since,
                 )
 
-            time.sleep(0.05)   # 50ms Polling
+            time.sleep(0.05)   # 50ms polling
 
         self._request.release()
 
     # ── sysfs Fallback ───────────────────────────────────────
 
     def _poll_with_sysfs(self):
-        """Fallback: /sys/class/gpio (deprecated aber universell)."""
-        # GPIO2_x → GPIO-Nummer = 64 + offset
+        """Fallback: /sys/class/gpio (deprecated but universal)."""
+        # GPIO2_x -> GPIO number = 64 + offset
         gpio_nums = {
             name: 64 + pin
             for name, pin in self._PINS.items()
@@ -149,7 +149,7 @@ class ButtonHandler:
         last_state = {n: 1 for n in gpio_nums}
         debounce_end = {n: 0.0 for n in gpio_nums}
 
-        log.info('sysfs GPIO Fallback aktiv')
+        log.info('sysfs GPIO fallback active')
 
         while self._running:
             now = time.monotonic()
@@ -194,9 +194,9 @@ class ButtonHandler:
                     with open(f'{path}/direction', 'w', encoding='utf-8') as f:
                         f.write('in')
                 except OSError as e:
-                    log.warning('GPIO %d export fehlgeschlagen: %s', num, e)
+                    log.warning('GPIO %d export failed: %s', num, e)
 
-    # ── Hilfsfunktionen ──────────────────────────────────────
+    # ── Helper functions ─────────────────────────────────────
 
     def _process_button_transition(
         self,
@@ -251,4 +251,4 @@ class ButtonHandler:
         try:
             self._callback(event)
         except RuntimeError as e:
-            log.error('Callback-Fehler: %s', e)
+            log.error('Callback error: %s', e)
