@@ -129,6 +129,38 @@ python3 display_manager.py
   - Cause: Cold solder joint
   - Fix: Rework with soldering iron
 
+## KiCad PCB files
+
+A KiCad 7 PCB with all footprints and the ratsnest pre-wired is available in
+[`kicad/`](kicad/):
+
+```text
+docs/kicad/
+├── pihole_display_cape.kicad_pcb  — PCB layout (open in KiCad 7 PCB Editor)
+├── pihole_display_cape.kicad_pro  — KiCad project file
+└── generate_kicad.py              — Python generator (re-run to regenerate)
+```
+
+Board dimensions: **55 × 28 mm**, covers P8/P9 pins 1–20.
+
+Suggested routing strategy inside KiCad:
+
+- **F.Cu** (top): K1–K4 button signals from P8 side
+- **B.Cu** (bottom): GND, +3.3V, SCL, SDA from P9 side
+
+## Display header pin assignment
+
+| Pin | Signal | Net       |
+|-----|--------|-----------|
+| 1   | GND    | /GND      |
+| 2   | VCC    | /+3.3V    |
+| 3   | SCL    | /SCL      |
+| 4   | SDA    | /SDA      |
+| 5   | K4 (*) | /BTN_K4   |
+| 6   | K3 (#) | /BTN_K3   |
+| 7   | K2 (v) | /BTN_K2   |
+| 8   | K1 (^) | /BTN_K1   |
+
 ## References
 
 - BeagleBone Black P8/P9 headers: [BeagleBone Black System Reference Manual](https://www.beagleboard.org/support/bone101/)
