@@ -2,7 +2,7 @@
 
 # ============================================================
 # button_handler.py — GPIO buttons via gpiod v2
-# BeagleBone Black: gpiochip2, pins 2/3/4/5
+# BeagleBone Black: gpiochip1, pins 2/3/4/5
 # All buttons: active-low (4.7K pull-up on board)
 # ============================================================
 

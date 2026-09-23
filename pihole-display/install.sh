@@ -24,7 +24,7 @@ apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
-    python3-gpiod \
+    python3-libgpiod \
     gpiod \
     i2c-tools \
     libi2c-dev \
@@ -46,7 +46,9 @@ cp -r ./* "$INSTALL_DIR/"
 
 # Python Virtual Environment
 echo "[4/5] Installing Python venv and packages..."
-python3 -m venv "$INSTALL_DIR/venv"
+# --system-site-packages: needed so the venv can see the apt-installed
+# python3-libgpiod module (not available via pip on all platforms)
+python3 -m venv --system-site-packages "$INSTALL_DIR/venv"
 "$INSTALL_DIR/venv/bin/pip" install --upgrade pip -q
 "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt" -q
 

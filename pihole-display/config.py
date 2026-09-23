@@ -8,14 +8,15 @@
 # --- I2C Display ---
 I2C_PORT = 2      # /dev/i2c-2 (P9_19=SCL, P9_20=SDA)
 I2C_ADDRESS = 0x3C   # SSD1306/SSD1315 default (0x3D if solder bridge is set)
+DISPLAY_ROTATE = 2   # 0=0°, 1=90°, 2=180°, 3=270°
 
-# --- GPIO buttons (all on gpiochip2) ---
+# --- GPIO buttons (all on gpiochip1, confirmed via /sys/kernel/debug/gpio) ---
 # Button pressed = LOW (4.7K pull-up on board)
-GPIO_CHIP = '/dev/gpiochip2'
-BTN_UP = 2   # P8_7  = GPIO2_2 = K1 (^)
-BTN_DOWN = 3   # P8_8  = GPIO2_3 = K2 (v)
-BTN_OK = 5   # P8_9  = GPIO2_5 = K3 (#)
-BTN_BACK = 4   # P8_10 = GPIO2_4 = K4 (*)
+GPIO_CHIP = '/dev/gpiochip1'
+BTN_UP = 2   # P8_7  = K1 (^)
+BTN_DOWN = 3   # P8_8  = K2 (v)
+BTN_OK = 5   # P8_9  = K3 (#)
+BTN_BACK = 4   # P8_10 = K4 (*)
 
 # --- Pi-hole ---
 PIHOLE_HOST = 'localhost'

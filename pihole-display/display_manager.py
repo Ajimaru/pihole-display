@@ -105,7 +105,12 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         """Initialize the OLED device using configured I2C settings."""
         try:
             serial = i2c(port=config.I2C_PORT, address=config.I2C_ADDRESS)
-            device = ssd1306(serial, width=self.W, height=self.H)
+            device = ssd1306(
+                serial,
+                width=self.W,
+                height=self.H,
+                rotate=config.DISPLAY_ROTATE,
+            )
             log.info(
                 'OLED initialized on I2C%d @ 0x%02X',
                 config.I2C_PORT,

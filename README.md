@@ -23,10 +23,10 @@ GND          →  P9 Pin 1    Ground
 VCC          →  P9 Pin 3    3.3V
 SCL          →  P9 Pin 19   I2C2 SCL
 SDA          →  P9 Pin 20   I2C2 SDA
-K1  (^)      →  P8 Pin 7    GPIO2_2
-K2  (v)      →  P8 Pin 8    GPIO2_3
-K3  (#)      →  P8 Pin 9    GPIO2_5
-K4  (*)      →  P8 Pin 10   GPIO2_4
+K1  (^)      →  P8 Pin 7    gpiochip1 line 2
+K2  (v)      →  P8 Pin 8    gpiochip1 line 3
+K3  (#)      →  P8 Pin 9    gpiochip1 line 5
+K4  (*)      →  P8 Pin 10   gpiochip1 line 4
 ```
 
 **-> Detailed wiring guide with perfboard adapter: [docs/WIRING_GUIDE.md](docs/WIRING_GUIDE.md)**
@@ -87,20 +87,29 @@ K4 (*)  long   → home screen
   ![status](docs/mockups/08_status_ok.png)
 - Status (error):
   ![status-error](docs/mockups/09_status_error.png)
-
-- Pi-hole menu: ![m1](docs/mockups/10_menu_pihole_active.png)
-- Scrolled: ![m2](docs/mockups/11_menu_pihole_scroll.png)
-- Pi-hole off: ![m3](docs/mockups/12_menu_pihole_off.png)
-- Unbound: ![m4](docs/mockups/13_menu_unbound.png)
-- Status actions: ![m5](docs/mockups/14_menu_status_actions.png)
-- Status actions (scrolled): ![m6](docs/mockups/14b_menu_status_scrolled.png)
+- Pi-hole menu:
+  ![m1](docs/mockups/10_menu_pihole_active.png)
+- Scrolled:
+  ![m2](docs/mockups/11_menu_pihole_scroll.png)
+- Pi-hole off:
+  ![m3](docs/mockups/12_menu_pihole_off.png)
+- Unbound:
+  ![m4](docs/mockups/13_menu_unbound.png)
+- Status actions:
+  ![m5](docs/mockups/14_menu_status_actions.png)
+- Status actions (scrolled):
+  ![m6](docs/mockups/14b_menu_status_scrolled.png)
 
 ### Status messages
 
-- Pause: ![p](docs/mockups/15_message_pause.png)
-- Active: ![a](docs/mockups/16_message_active.png)
-- Flush: ![f](docs/mockups/18_message_flush.png)
-- Gravity update: ![g](docs/mockups/19_message_gravity_update.png)
+- Pause:
+  ![p](docs/mockups/15_message_pause.png)
+- Active:
+  ![a](docs/mockups/16_message_active.png)
+- Flush:
+  ![f](docs/mockups/18_message_flush.png)
+- Gravity update:
+  ![g](docs/mockups/19_message_gravity_update.png)
 
 ## Installation
 

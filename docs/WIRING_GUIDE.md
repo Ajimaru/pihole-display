@@ -18,12 +18,12 @@ This guide explains how to correctly wire the OLED display and the 4 buttons on 
 BeagleBone Black
 ├── P8 header (left)   ──┐
 │                        ├──[Perfboard adapter]──┐
-└── P9 header (right) ──┘                        │
-                                                  ├── OLED display (SSD1315)
-                                                  ├── Button K1 (up)
-                                                  ├── Button K2 (down)
-                                                  ├── Button K3 (select/enter)
-                                                  └── Button K4 (home/cancel)
+└── P9 header (right)  ──┘                       │
+                                                 ├── OLED display (SSD1315)
+                                                 ├── Button K1 (up)
+                                                 ├── Button K2 (down)
+                                                 ├── Button K3 (select/enter)
+                                                 └── Button K4 (home/cancel)
 ```
 
 ## Materials
@@ -103,8 +103,8 @@ ssh root@beaglebone
 # 2. Check I2C display (should show 0x3C or 0x3D)
 i2cdetect -y -r 2
 
-# 3. Check GPIO pins (should include GPIO2_2 to GPIO2_5)
-ls /sys/class/gpio/
+# 3. Check GPIO pins (P8_7-P8_10 should appear on gpiochip1, lines 2-5)
+sudo cat /sys/kernel/debug/gpio
 
 # 4. Test buttons (before installation)
 cd /tmp/pihole-display
@@ -122,6 +122,11 @@ python3 display_manager.py
 - **Buttons do not respond**
   - Cause: GPIO pin not connected or wrong pin used
   - Fix: Verify wiring against the diagram
+  - Cause: Wrong `/dev/gpiochipN` in `config.py` (TRM silicon names like
+    `gpio2[2]` do not match the Linux `gpiochip` numbering)
+  - Fix: Confirm the real mapping with `sudo cat /sys/kernel/debug/gpio`
+    and match the `P8_x` labels shown there to `GPIO_CHIP`/`BTN_*` in
+    `config.py`
 - **Display flickers**
   - Cause: Insufficient power supply stability
   - Fix: Verify 3.3V line, use thicker wires
@@ -160,6 +165,14 @@ Suggested routing strategy inside KiCad:
 | 6   | K3 (#) | /BTN_K3   |
 | 7   | K2 (v) | /BTN_K2   |
 | 8   | K1 (^) | /BTN_K1   |
+
+> **Note on GPIO numbering:** The P8/P9 header table above uses the AM335x TRM
+> silicon names (e.g. `gpio2[2]` for P8_7). This does **not** match the Linux
+> `/dev/gpiochipN` enumeration used in software! Verified via
+> `sudo cat /sys/kernel/debug/gpio` on Debian 13 Trixie, P8_7/P8_8/P8_9/P8_10
+> are exposed as `gpiochip1` lines 2/3/5/4 (not `gpiochip2` as the TRM name
+> would suggest). `config.py`'s `GPIO_CHIP`/`BTN_*` constants reflect this
+> confirmed Linux-side mapping.
 
 ## References
 
