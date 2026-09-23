@@ -1,38 +1,54 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Report a problem with the display, buttons or shown data
 title: ''
-labels: ''
+labels: bug
 assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+<!-- Security issues: please do not report them here, see SECURITY.md. -->
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+## Describe the bug
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+What is wrong? E.g. wrong value on a screen, button does nothing, service
+crashes.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## To reproduce
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+1. Screen / menu: [e.g. System → Screen lock]
+2. Buttons pressed: [e.g. # short, then ^]
+3. What happens:
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+## Expected behavior
 
-**Additional context**
-Add any other context about the problem here.
+What should have happened instead.
+
+## Photo or screenshot
+
+If it is a display problem, a photo of the OLED helps.
+
+## Environment
+
+- pihole-display version: [shown in the System screen header, e.g. v0.0.1]
+- Board: [e.g. BeagleBone Black]
+- OS / kernel: [output of `cat /etc/os-release | head -1` and `uname -r`]
+- Pi-hole version: [output of `pihole -v`]
+- Unbound version: [output of `sudo unbound -V | head -1`, or "not used"]
+- Display: [e.g. SSD1315, I2C address 0x3C]
+
+## Service log
+
+Output of `sudo journalctl -u pihole-display -n 50 --no-pager`:
+
+```text
+paste log here
+```
+
+## Changes to config.py
+
+Anything changed from the defaults (leave out passwords).
+
+## Additional context
+
+Anything else, e.g. custom wiring or a different case.

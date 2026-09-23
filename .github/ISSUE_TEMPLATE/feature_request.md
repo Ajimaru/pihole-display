@@ -1,20 +1,44 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Suggest a new screen, menu action, button function or hardware support
 title: ''
-labels: ''
+labels: enhancement
 assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## What problem does this solve?
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+What is missing or annoying today? E.g. "I can't see which client made the
+most queries without opening the web interface."
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Proposed solution
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+What should pihole-display do? If it is about the display, say which screen or
+menu it belongs to and which button should trigger it.
+
+## Display layout (optional)
+
+The OLED is 128×64 px, about 3 lines of values between header and footer. A
+rough sketch helps:
+
+```text
+Title          ●14:32
+Label:           value
+Label:           value
+Label:           value
+[^][v] Screen  [#]Menu
+```
+
+## Alternatives considered
+
+Other ways you thought about, e.g. a different screen or the Pi-hole web
+interface.
+
+## Hardware (if relevant)
+
+Board, display or extra parts this needs, e.g. an I2C temperature sensor.
+
+## Additional context
+
+Anything else, e.g. links or photos.
