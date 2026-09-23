@@ -36,6 +36,7 @@ class ButtonEvent(Enum):
     OK_LONG = auto()   # # long
     BACK_SHORT = auto()   # * short
     BACK_LONG = auto()   # * long -> Home
+    BACK_HOLD = auto()   # * held for HOLD_MS -> unlock screen
 
 
 class ButtonHandler:
@@ -68,13 +69,16 @@ class ButtonHandler:
     def stop(self):
         """Stop polling and release any claimed GPIO resources."""
         self._running = False
-        if self._request:
-            try:
-                self._request.release()
-            except (AttributeError, OSError, RuntimeError):
-                pass
+        # The poll thread releases its lines on exit; releasing them here
+        # while it still polls would make it fail on the released request.
         if self._thread:
             self._thread.join(timeout=2)
+        if self._request and not (self._thread and self._thread.is_alive()):
+            try:
+                self._request.release()
+            except Exception:  # pylint: disable=broad-except
+                pass  # already released
+            self._request = None
         log.info('Button handler stopped')
 
     def _poll_loop(self):
@@ -102,13 +106,22 @@ class ButtonHandler:
             config=config_map
         )
 
+        log.info('gpiod polling active on %s, pins %s', config.GPIO_CHIP, pins)
+
+        try:
+            self._poll_gpiod_lines(pins, names)
+        finally:
+            self._request.release()
+            self._request = None
+
+    def _poll_gpiod_lines(self, pins, names):
+        """Poll the requested gpiod lines until the handler is stopped."""
         # State: {pin: (pressed_since_ts or None)}
         pressed_since = {p: None for p in pins}
         # HIGH = not pressed
         last_state = {p: Value.ACTIVE for p in pins}
         debounce_end = {p: 0.0 for p in pins}
-
-        log.info('gpiod polling active on %s, pins %s', config.GPIO_CHIP, pins)
+        hold_fired = {p: False for p in pins}
 
         while self._running:
             now = time.monotonic()
@@ -128,11 +141,11 @@ class ButtonHandler:
                     last_state=last_state,
                     new_state=val,
                     pressed_since=pressed_since,
+                    hold_fired=hold_fired,
                 )
+                self._check_hold(pin, names[i], now, pressed_since, hold_fired)
 
             time.sleep(0.05)   # 50ms polling
-
-        self._request.release()
 
     # ── sysfs Fallback ───────────────────────────────────────
 
@@ -148,6 +161,7 @@ class ButtonHandler:
         pressed_since = {n: None for n in gpio_nums}
         last_state = {n: 1 for n in gpio_nums}
         debounce_end = {n: 0.0 for n in gpio_nums}
+        hold_fired = {n: False for n in gpio_nums}
 
         log.info('sysfs GPIO fallback active')
 
@@ -175,7 +189,9 @@ class ButtonHandler:
                     last_state=last_state,
                     new_state=val,
                     pressed_since=pressed_since,
+                    hold_fired=hold_fired,
                 )
+                self._check_hold(name, name, now, pressed_since, hold_fired)
 
             time.sleep(0.05)
 
@@ -209,6 +225,7 @@ class ButtonHandler:
         last_state: dict,
         new_state,
         pressed_since: dict,
+        hold_fired: dict,
     ):  # pylint: disable=too-many-arguments,too-many-positional-arguments
         """Apply debounce and emit short/long press events on release edges."""
         if pressed == was_pressed:
@@ -229,22 +246,42 @@ class ButtonHandler:
 
         held = now - started
         pressed_since[key] = None
-        event = self._make_event(name, held >= config.LONG_PRESS_MS / 1000.0)
+        if hold_fired[key]:
+            # The hold event already fired while the button was down
+            hold_fired[key] = False
+            return
+        kind = 'long' if held >= config.LONG_PRESS_MS / 1000.0 else 'short'
+        event = self._make_event(name, kind)
         if event:
             self._dispatch(event)
 
-    def _make_event(self, name: str, long: bool) -> Optional[ButtonEvent]:
+    def _check_hold(
+        self, key, name: str, now: float, pressed_since: dict,
+        hold_fired: dict,
+    ):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        """Emit a hold event once a button has been down for HOLD_MS."""
+        started = pressed_since.get(key)
+        if started is None or hold_fired[key]:
+            return
+        if now - started >= config.HOLD_MS / 1000.0:
+            hold_fired[key] = True
+            event = self._make_event(name, 'hold')
+            if event:
+                self._dispatch(event)
+
+    def _make_event(self, name: str, kind: str) -> Optional[ButtonEvent]:
         mapping = {
-            ('up',   False): ButtonEvent.UP_SHORT,
-            ('up',   True):  ButtonEvent.UP_LONG,
-            ('down', False): ButtonEvent.DOWN_SHORT,
-            ('down', True):  ButtonEvent.DOWN_LONG,
-            ('ok',   False): ButtonEvent.OK_SHORT,
-            ('ok',   True):  ButtonEvent.OK_LONG,
-            ('back', False): ButtonEvent.BACK_SHORT,
-            ('back', True):  ButtonEvent.BACK_LONG,
+            ('up',   'short'): ButtonEvent.UP_SHORT,
+            ('up',   'long'):  ButtonEvent.UP_LONG,
+            ('down', 'short'): ButtonEvent.DOWN_SHORT,
+            ('down', 'long'):  ButtonEvent.DOWN_LONG,
+            ('ok',   'short'): ButtonEvent.OK_SHORT,
+            ('ok',   'long'):  ButtonEvent.OK_LONG,
+            ('back', 'short'): ButtonEvent.BACK_SHORT,
+            ('back', 'long'):  ButtonEvent.BACK_LONG,
+            ('back', 'hold'):  ButtonEvent.BACK_HOLD,
         }
-        return mapping.get((name, long))
+        return mapping.get((name, kind))
 
     def _dispatch(self, event: ButtonEvent):
         log.debug('Button-Event: %s', event.name)

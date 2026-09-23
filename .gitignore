@@ -1,8 +1,5 @@
 # IDE / Tools
-.github/instructions/codacy.instructions.md
-.codacy/
-.vscode/
-.claude/
+/docs/kicad/pihole_display_cape.kicad_prl
 
 # Python
 __pycache__/

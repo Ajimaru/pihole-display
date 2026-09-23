@@ -66,15 +66,31 @@ class PiholeAPI:
             pass
         return None
 
+    @staticmethod
+    def _v6_password() -> str:
+        """Return the configured password or Pi-hole's local CLI password.
+
+        FTL rewrites the CLI password file on every restart, so it is read
+        again for each login.
+        """
+        if config.PIHOLE_PASSWORD:
+            return config.PIHOLE_PASSWORD
+        try:
+            with open(config.PIHOLE_CLI_PW, encoding='utf-8') as f:
+                return f.read().strip()
+        except OSError:
+            return ''
+
     def _ensure_v6_auth(self):
         if self._session_token:
             return True
-        if not config.PIHOLE_PASSWORD:
+        password = self._v6_password()
+        if not password:
             return False
         try:
             r = requests.post(
                 f'{self._base_v6}/auth',
-                json={'password': config.PIHOLE_PASSWORD},
+                json={'password': password},
                 timeout=3
             )
             data = r.json()
@@ -88,6 +104,26 @@ class PiholeAPI:
         if self._session_token:
             return {'X-FTL-SID': self._session_token}
         return {}
+
+    def _request_v6(self, method: str, path: str, **kwargs):
+        """Send an authenticated v6 API request, re-logging in once on 401.
+
+        Sessions expire after a while and on FTL restarts.
+        """
+        for attempt in range(2):
+            self._ensure_v6_auth()
+            r = requests.request(
+                method,
+                f'{self._base_v6}{path}',
+                headers=self._headers_v6(),
+                timeout=5,
+                **kwargs,
+            )
+            if r.status_code != 401 or attempt:
+                break
+            self._session_token = None
+        r.raise_for_status()
+        return r
 
     def fetch(self) -> PiholeStats:
         """Return current Pi-hole stats using the detected API version."""
@@ -126,15 +162,7 @@ class PiholeAPI:
         return stats
 
     def _fetch_v6(self, stats: PiholeStats) -> PiholeStats:
-        self._ensure_v6_auth()
-        headers = self._headers_v6()
-
-        r = requests.get(
-            f'{self._base_v6}/stats/summary',
-            headers=headers,
-            timeout=5,
-        )
-        d = r.json()
+        d = self._request_v6('GET', '/stats/summary').json()
         queries = d.get('queries', {})
         stats.version = 6
         stats.blocked_today = queries.get('blocked', 0)
@@ -146,13 +174,9 @@ class PiholeAPI:
             0,
         )
 
-        rb = requests.get(
-            f'{self._base_v6}/dns/blocking',
-            headers=headers,
-            timeout=5,
-        )
-        db = rb.json()
-        stats.enabled = db.get('blocking', False)
+        db = self._request_v6('GET', '/dns/blocking').json()
+        # 'enabled', 'disabled', 'failed' or 'unknown'
+        stats.enabled = db.get('blocking') == 'enabled'
         stats.pause_remaining = db.get('timer', 0) or 0
         return stats
 
@@ -189,17 +213,11 @@ class PiholeAPI:
         return r.status_code == 200
 
     def _set_blocking_v6(self, enable: bool, seconds: int) -> bool:
-        self._ensure_v6_auth()
         payload: dict[str, object] = {'blocking': enable}
         if not enable and seconds:
             payload['timer'] = seconds
-        r = requests.post(
-            f'{self._base_v6}/dns/blocking',
-            headers=self._headers_v6(),
-            json=payload,
-            timeout=5
-        )
-        return r.status_code == 200
+        self._request_v6('POST', '/dns/blocking', json=payload)
+        return True
 
     def flush_cache(self) -> bool:
         """Trigger a Pi-hole DNS reload to flush resolver cache."""
@@ -292,10 +310,10 @@ class UnboundData:
         return stats
 
     def flush_cache(self) -> bool:
-        """Flush the Unbound cache through `unbound-control flush_all`."""
+        """Flush the whole Unbound cache (everything below the root zone)."""
         try:
             result = subprocess.run(
-                ['unbound-control', 'flush_all'],
+                ['unbound-control', 'flush_zone', '.'],
                 capture_output=True, timeout=10, check=False
             )
             return result.returncode == 0
@@ -314,7 +332,7 @@ class SystemStats:  # pylint: disable=too-many-instance-attributes
     ip_address: str = ''
     gateway: str = ''
     cpu_percent: float = 0.0
-    cpu_temp: float = 0.0
+    cpu_temp: Optional[float] = None  # None = no sensor
     ram_used_mb: int = 0
     ram_total_mb: int = 0
     disk_used_gb: float = 0.0
@@ -376,7 +394,7 @@ class SystemData:  # pylint: disable=too-few-public-methods
         except (OSError, subprocess.SubprocessError):
             return ''
 
-    def _get_cpu_temp(self) -> float:
+    def _get_cpu_temp(self) -> Optional[float]:
         # BeagleBone Black temperature sensor
         paths = [
             '/sys/class/thermal/thermal_zone0/temp',
@@ -395,7 +413,7 @@ class SystemData:  # pylint: disable=too-few-public-methods
                     return entries[0].current
         except (AttributeError, OSError):
             pass
-        return 0.0
+        return None
 
     def _format_uptime(self, seconds: int) -> str:
         days = seconds // 86400

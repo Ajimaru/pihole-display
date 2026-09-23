@@ -5,14 +5,16 @@
 # main.py — pihole-display main program
 # BeagleBone Black + SSD1315 OLED + 4 buttons
 #
-# Buttons:
-#   K1 (^) = previous screen / menu up
-#   K2 (v) = next screen     / menu down
+# Buttons (display mounted rotated, see config.py):
+#   K2 (^) = previous screen / menu up
+#   K1 (v) = next screen     / menu down
 #   K3 (#) = action / confirm
-#   K4 (*) = back / long = home
+#   K4 (*) = back / long = home, held 5s = wake locked display
 # ============================================================
 
+import json
 import logging
+import os
 import signal
 import threading
 import time
@@ -23,6 +25,7 @@ import config
 from data import DataCache
 from display_manager import DisplayManager, Screen, UIMode
 from button_handler import ButtonHandler, ButtonEvent
+from version import __version__
 
 # ── Logging ──────────────────────────────────────────────────
 logging.basicConfig(
@@ -44,6 +47,25 @@ class App:  # pylint: disable=too-few-public-methods
         self._buttons = ButtonHandler(self._on_button)
         self._running = False
         self._data_lock = threading.Lock()
+        self._screen_lock = self._load_state().get('screen_lock', False)
+
+    # ── Persistent state ─────────────────────────────────────
+
+    @staticmethod
+    def _load_state() -> dict:
+        try:
+            with open(config.STATE_FILE, encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def _save_state(self):
+        try:
+            os.makedirs(os.path.dirname(config.STATE_FILE), exist_ok=True)
+            with open(config.STATE_FILE, 'w', encoding='utf-8') as f:
+                json.dump({'screen_lock': self._screen_lock}, f)
+        except OSError as e:
+            log.error('Saving state failed: %s', e)
 
     # ── Start / Stop ─────────────────────────────────────────
 
@@ -52,7 +74,7 @@ class App:  # pylint: disable=too-few-public-methods
 
         The loop also handles periodic data refresh and clean shutdown.
         """
-        log.info('pihole-display starting')
+        log.info('pihole-display v%s starting', __version__)
         self._running = True
 
         # Initial data fetch
@@ -96,9 +118,11 @@ class App:  # pylint: disable=too-few-public-methods
         """Called from the button thread - keep it fast."""
         mode = self._display.mode
 
-        # Wake display on every button press
+        # Wake display on every button press, or only on holding * while
+        # the screen lock is enabled
         if mode == UIMode.SLEEP:
-            self._display.wake()
+            if not self._screen_lock or event == ButtonEvent.BACK_HOLD:
+                self._display.wake()
             return
 
         if mode == UIMode.MENU:
@@ -158,7 +182,9 @@ class App:  # pylint: disable=too-few-public-methods
             self._menu_unbound()
         elif screen == Screen.STATUS:
             self._menu_status()
-        # NETWORK and SYSTEM have no menu
+        elif screen == Screen.SYSTEM:
+            self._menu_system()
+        # NETWORK has no menu
 
     def _menu_pihole(self):
         ph = self._data.pihole
@@ -197,7 +223,55 @@ class App:  # pylint: disable=too-few-public-methods
             ),
         ])
 
+    def _menu_system(self):
+        lock = 'on' if self._screen_lock else 'off'
+        lock_title = 'Lock off?' if self._screen_lock else 'Lock on?'
+        self._display.show_menu([
+            ('Reboot', partial(
+                self._confirm, 'Reboot?', partial(self._power, 'reboot'),
+            )),
+            ('Shutdown', partial(
+                self._confirm, 'Shutdown?', partial(self._power, 'poweroff'),
+            )),
+            (f'Screen lock: {lock}', partial(
+                self._confirm, lock_title, self._toggle_screen_lock,
+            )),
+        ])
+
+    def _confirm(self, title: str, action):
+        # 'No' comes first so it is preselected
+        self._display.show_menu([
+            ('No',  lambda: None),
+            ('Yes', action),
+        ], title=title)
+
     # ── Actions ──────────────────────────────────────────────
+
+    def _toggle_screen_lock(self):
+        self._screen_lock = not self._screen_lock
+        self._save_state()
+        self._display.show_message(
+            'Screen lock\nON\n(hold * 5s)' if self._screen_lock
+            else 'Screen lock\nOFF',
+        )
+
+    def _power(self, command: str):
+        """Reboot or power off the system via systemctl."""
+        log.info('System %s requested via buttons', command)
+        self._display.show_message(
+            'Rebooting...' if command == 'reboot' else 'Shutting\ndown...',
+            duration=60,
+        )
+        result = subprocess.run(
+            ['systemctl', command],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if result.returncode != 0:
+            log.error('systemctl %s failed: %s', command, result.stderr)
+            self._display.show_message('Error!')
 
     def _pihole_pause(self, seconds: int):
         mins = seconds // 60

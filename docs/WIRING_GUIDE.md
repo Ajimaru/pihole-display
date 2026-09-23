@@ -6,13 +6,13 @@ This guide explains how to correctly wire the OLED display and the 4 buttons on 
 
 ### Bill of Materials
 
-| Part | Qty | Approx. price |
-| --- | --- | --- |
-| 2.54mm perfboard | 1x (min. 12x6 holes) | ~0.50 EUR |
-| 1x8 pin header (male) | 1x | ~0.20 EUR |
-| Single female Dupont crimp pins + wire | 8x, about 10cm each | ~1 EUR |
-| Solder wire (0.5mm) | 1 roll | ~2 EUR |
-| **Total** | **~4 EUR** | |
+| Part | Qty |
+| --- | --- |
+| 2.54mm perfboard | 1x (min. 10x21 holes) |
+| 1x16 pin header (male) | 1x |
+| wire | 8x, about 7cm each |
+| OLED display (SSD1315) with four buttons | 1x |
+| **Total** | **4 items** |
 
 ```text
 BeagleBone Black
@@ -29,10 +29,7 @@ BeagleBone Black
 ## Materials
 
 - BeagleBone Black with Debian 13 Trixie
-- 0.96" OLED display SSD1315 (128x64 pixels, I2C)
-- 4x tactile push buttons (for example 6mm x 6mm)
-- Perfboard (2.54mm grid, min. 12x6 holes)
-- 1x8 pin header (male) for the display connector
+- Perfboard with OLED display (SSD1315) and four buttons mounted
 
 ## BeagleBone Black Headers - Pinouts
 
@@ -70,16 +67,16 @@ BeagleBone Black
 ```text
 P9 header (left)            Perfboard adapter                 P8 header (right)
 ┌──────────────┐            ┌──────────────────────┐         ┌──────────────┐
-│ Pin 1 (GND)  ├────────────┤ GND bus rail         ├─────────┤ Pin 1 (GND)  │
-│ Pin 2 (GND)  ├────────────┤        ↓             ├─────────┤ Pin 2 (GND)  │
-│ Pin 3 (3.3V) ├────────────┤        |             │         │              │
+│ Pin 2 (GND)  ├────────────┤ GND bus rail         │         │              │
+│ Pin 4 (3.3V) ├────────────┤        ↓             │         │              │
 │ Pin 19(SCL)  ├────────────┤        |             │         │              │
 │ Pin 20(SDA)  ├────────────┤        |             │         │              │
+│              ├────────────┤        |             │         │              │
 │              │            │        |             │         │              │
 └──────────────┘            │        |             │         │              │
-                            │ 3.3V bus rail        ├─────────┤              │
+                            │ 3.3V bus rail        │         │              │
                             │        ↑             │         │              │
-                            │   Pull-up resistor   │         │              │
+                            │              │       │         │              │
                             │              │       │         │              │
                             │  Display     │       │         │              │
                             │  (I2C SSD1315)       │         │              │
@@ -97,21 +94,26 @@ P9 header (left)            Perfboard adapter                 P8 header (right)
 After wiring is complete, run the following checks:
 
 ```bash
-# 1. SSH to BBB
-ssh root@beaglebone
+# 1. SSH to BBB (root login is disabled on the BeagleBoard images)
+ssh <user>@<BBB_IP_ADDRESS>
 
-# 2. Check I2C display (should show 0x3C or 0x3D)
-i2cdetect -y -r 2
+# 2. Install the test tools (install.sh installs them too)
+sudo apt install i2c-tools gpiod
 
-# 3. Check GPIO pins (P8_7-P8_10 should appear on gpiochip1, lines 2-5)
-sudo cat /sys/kernel/debug/gpio
+# 3. Check I2C display (should show 3c, or 3d if the address bridge is set)
+sudo i2cdetect -y -r 2
 
-# 4. Test buttons (before installation)
-cd /tmp/pihole-display
-python3 button_handler.py
+# 4. Check GPIO pins (P8_7/P8_8/P8_10/P8_9 = gpiochip1 lines 2/3/4/5)
+sudo cat /sys/kernel/debug/gpio | grep -A6 'gpiochip1:'
 
-# 5. Test display
-python3 display_manager.py
+# 5. Test buttons: prints an event per press and release, Ctrl+C to stop.
+#    If pihole-display is already running it holds the lines, so stop it
+#    first: sudo systemctl stop pihole-display
+sudo gpiomon -c gpiochip1 2 3 4 5
+
+# 6. Test display: after install.sh the log should contain
+#    "OLED initialized on I2C2 @ 0x3C"
+sudo journalctl -u pihole-display -n 20
 ```
 
 ## Troubleshooting
@@ -136,15 +138,19 @@ python3 display_manager.py
 
 ## KiCad PCB files
 
-A KiCad 7 PCB with all footprints and the ratsnest pre-wired is available in
+A KiCad PCB with all footprints and the ratsnest pre-wired is available in
 [`kicad/`](kicad/):
 
 ```text
 docs/kicad/
-├── pihole_display_cape.kicad_pcb  — PCB layout (open in KiCad 7 PCB Editor)
+├── pihole_display_cape.kicad_pcb  — PCB layout (last saved with KiCad 10)
 ├── pihole_display_cape.kicad_pro  — KiCad project file
-└── generate_kicad.py              — Python generator (re-run to regenerate)
+└── generate_kicad.py              — Python generator (KiCad 7 format)
 ```
+
+> **Note:** Re-running `generate_kicad.py` overwrites
+> `pihole_display_cape.kicad_pcb`, so any changes made in the PCB Editor are
+> lost.
 
 Board dimensions: **55 × 28 mm**, covers P8/P9 pins 1–20.
 
@@ -166,6 +172,10 @@ Suggested routing strategy inside KiCad:
 | 7   | K2 (v) | /BTN_K2   |
 | 8   | K1 (^) | /BTN_K1   |
 
+The `^`/`v` labels are the ones printed on the display module. Because the
+display is mounted rotated by 180°, the software uses K2 as up and K1 as down
+(`BTN_UP`/`BTN_DOWN` in `config.py`).
+
 > **Note on GPIO numbering:** The P8/P9 header table above uses the AM335x TRM
 > silicon names (e.g. `gpio2[2]` for P8_7). This does **not** match the Linux
 > `/dev/gpiochipN` enumeration used in software! Verified via
@@ -176,5 +186,5 @@ Suggested routing strategy inside KiCad:
 
 ## References
 
-- BeagleBone Black P8/P9 headers: [BeagleBone Black System Reference Manual](https://www.beagleboard.org/support/bone101/)
-- SSD1315 OLED driver: [SSD1315 Datasheet](https://cdn-shop.adafruit.com/datasheets/SSD1315.pdf)
+- BeagleBone Black P8/P9 headers: [BeagleBone Black documentation – Connectors](https://docs.beagleboard.org/boards/beaglebone/black/ch07.html)
+- SSD1315 OLED driver: [SSD1315 Datasheet](https://files.waveshare.com/upload/f/f0/SSD1315_1.1.pdf)

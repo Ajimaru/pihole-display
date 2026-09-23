@@ -13,10 +13,11 @@ from typing import Callable, List, Optional, Tuple
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
 from luma.core.render import canvas
-from PIL import ImageFont
+from PIL import Image, ImageFont
 
 import config
 from data import DataCache
+from version import __version__
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,28 @@ except OSError:
     _FONT_SM = ImageFont.load_default()
     _FONT_MD = ImageFont.load_default()
     _FONT_LG = ImageFont.load_default()
+
+
+def _bitmap(rows: List[str]) -> Image.Image:
+    """Build a 1-bit image from rows of '#' (on) and '.' (off)."""
+    img = Image.new('1', (len(rows[0]), len(rows)))
+    img.putdata([255 if c == '#' else 0 for row in rows for c in row])
+    return img
+
+
+# Pixel arrows for hint lines: the 9px '^' and 'v' glyphs don't read as
+# arrows, so hints use U+2191/U+2193 and these bitmaps are drawn instead.
+_ARROW_UP = _bitmap([
+    '..#..',
+    '.###.',
+    '#.#.#',
+    '..#..',
+    '..#..',
+])
+_HINT_GLYPHS = {
+    '\u2191': _ARROW_UP,
+    '\u2193': _ARROW_UP.transpose(Image.Transpose.FLIP_TOP_BOTTOM),
+}
 
 
 # ── Screen definitions ───────────────────────────────────────
@@ -97,6 +120,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         self._screen_idx = 0
         self._menu_items: List[Tuple[str, Callable[[], None]]] = []
         self._menu_sel = 0
+        self._menu_title = ''
         self._msg_text = ''
         self._msg_until = 0.0
         self._last_input = time.monotonic()
@@ -155,10 +179,15 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         self._mode = UIMode.NORMAL
         self._wake()
 
-    def show_menu(self, items: List[Tuple[str, Callable[[], None]]]):
+    def show_menu(
+        self,
+        items: List[Tuple[str, Callable[[], None]]],
+        title: str = 'Action:',
+    ):
         """Open the action menu with the provided label/action entries."""
         self._menu_items = items
         self._menu_sel = 0
+        self._menu_title = title
         self._mode = UIMode.MENU
         self._wake()
 
@@ -278,29 +307,49 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         """Header row: title (LG, left) + status/time (SM, right)."""
         now = time.strftime('%H:%M')
         dot = '\u25CF' if ok else '!'
-        draw.text((0, 0), title, font=_FONT_LG, fill='white')
+        draw.text((0, -2), title, font=_FONT_LG, fill='white')
         right = f'{status} {dot}{now}' if status else f'{dot}{now}'
-        # Right align: ~6px per character with FONT_SM
-        rx = max(0, self.W - len(right) * 6)
-        draw.text((rx, 3), right, font=_FONT_SM, fill='white')
-        draw.line([(0, 14), (self.W, 14)], fill='white', width=1)
+        rx = max(0, self.W - int(_FONT_SM.getlength(right)))
+        draw.text((rx, 2), right, font=_FONT_SM, fill='white')
+        draw.line([(0, 12), (self.W, 12)], fill='white', width=1)
 
     def _nav_hint(self, draw, action_label: str = ''):
         """Bottom navigation: ^ Screen v  [#]Action"""
-        y = self.H - 10
+        y = self.H - 9
         draw.line([(0, y - 1), (self.W, y - 1)], fill='white', width=1)
-        hint = '[^][v] Screen'
+        hint = '[\u2191][\u2193] Screen'
         if action_label:
             hint += f'  [#]{action_label}'
-        draw.text((0, y), hint, font=_FONT_SM, fill='white')
+        self._hint_text(draw, y, hint)
+
+    @staticmethod
+    def _hint_text(draw, y: int, text: str):
+        """Draw a small-font hint line, rendering arrows as pixel glyphs."""
+        x = 0
+        for ch in text:
+            glyph = _HINT_GLYPHS.get(ch)
+            if glyph:
+                draw.bitmap((x, y + 3), glyph, fill='white')
+                x += _FONT_SM.getlength(' ')
+            else:
+                draw.text((x, y), ch, font=_FONT_SM, fill='white')
+                x += _FONT_SM.getlength(ch)
+
+    def _value_row(self, draw, y: int, label: str, value: str):
+        """Draw a label on the left and its value right-aligned.
+
+        Right-aligning keeps the values of all rows in one column,
+        whatever the label length.
+        """
+        draw.text((0, y), label, font=_FONT_MD, fill='white')
+        x = self.W - int(_FONT_MD.getlength(value))
+        draw.text((x, y), value, font=_FONT_MD, fill='white')
 
     def _screen_pihole(self, draw):
         ph = self._data.pihole
         ok = ph.enabled and not ph.error
 
         if ph.pause_remaining > 0:
-            mins = ph.pause_remaining // 60
-            secs = ph.pause_remaining % 60
             status = 'PAUSE'
         elif ph.enabled:
             status = 'ACTIVE'
@@ -311,51 +360,22 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
 
         if ph.error:
             draw.text(
-                (0, 17),
+                (0, 15),
                 'Error: ' + ph.error[:18],
                 font=_FONT_SM,
                 fill='white',
             )
-        elif ph.pause_remaining > 0:
-            mins = ph.pause_remaining // 60
-            secs = ph.pause_remaining % 60
-            draw.text(
-                (0, 17),
-                f'Left:  {mins:02d}:{secs:02d}',
-                font=_FONT_MD,
-                fill='white',
-            )
-            draw.text(
-                (0, 30),
-                f'Req:   {ph.queries_today:>7,}',
-                font=_FONT_MD,
-                fill='white',
-            )
-            draw.text(
-                (0, 43),
-                f'Clients:{ph.clients:>6}',
-                font=_FONT_MD,
-                fill='white',
-            )
         else:
-            draw.text(
-                (0, 17),
-                f'Block: {ph.block_percent:5.1f}%',
-                font=_FONT_MD,
-                fill='white',
-            )
-            draw.text(
-                (0, 30),
-                f'Req:   {ph.queries_today:>7,}',
-                font=_FONT_MD,
-                fill='white',
-            )
-            draw.text(
-                (0, 43),
-                f'Clients:{ph.clients:>6}',
-                font=_FONT_MD,
-                fill='white',
-            )
+            if ph.pause_remaining > 0:
+                mins = ph.pause_remaining // 60
+                secs = ph.pause_remaining % 60
+                self._value_row(draw, 14, 'Left:', f'{mins:02d}:{secs:02d}')
+            else:
+                self._value_row(
+                    draw, 14, 'Block:', f'{ph.block_percent:.1f}%',
+                )
+            self._value_row(draw, 27, 'Req:', f'{ph.queries_today:,}')
+            self._value_row(draw, 40, 'Clients:', f'{ph.clients}')
 
         self._nav_hint(draw, 'Menu')
 
@@ -367,30 +387,15 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
 
         if ub.error:
             draw.text(
-                (0, 17),
+                (0, 15),
                 'Error: ' + ub.error[:18],
                 font=_FONT_SM,
                 fill='white',
             )
         else:
-            draw.text(
-                (0, 17),
-                f'Cache: {ub.cache_percent:5.1f}%',
-                font=_FONT_MD,
-                fill='white',
-            )
-            draw.text(
-                (0, 30),
-                f'Q/s:   {ub.queries_ps:>6.1f}',
-                font=_FONT_MD,
-                fill='white',
-            )
-            draw.text(
-                (0, 43),
-                f'Total: {ub.queries_total:>7,}',
-                font=_FONT_MD,
-                fill='white',
-            )
+            self._value_row(draw, 14, 'Cache:', f'{ub.cache_percent:.1f}%')
+            self._value_row(draw, 27, 'Q/s:', f'{ub.queries_ps:.1f}')
+            self._value_row(draw, 40, 'Total:', f'{ub.queries_total:,}')
 
         self._nav_hint(draw, 'Menu')
 
@@ -398,20 +403,20 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         sy = self._data.system
         self._header(draw, 'Network', '', True)
         draw.text(
-            (0, 16),
+            (0, 13),
             f'IP:   {sy.ip_address}',
             font=_FONT_SM,
             fill='white',
         )
-        draw.text((0, 26), f'GW:   {sy.gateway}', font=_FONT_SM, fill='white')
+        draw.text((0, 23), f'GW:   {sy.gateway}', font=_FONT_SM, fill='white')
         draw.text(
-            (0, 36),
+            (0, 33),
             f'Host: {sy.hostname[:14]}',
             font=_FONT_SM,
             fill='white',
         )
         draw.text(
-            (0, 44),
+            (0, 43),
             f'Up:   {sy.uptime_str}',
             font=_FONT_SM,
             fill='white',
@@ -420,26 +425,18 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
 
     def _screen_system(self, draw):
         sy = self._data.system
-        self._header(draw, 'System', '', True)
-        draw.text(
-            (0, 17),
-            f'CPU: {sy.cpu_percent:4.0f}%  {sy.cpu_temp:.0f}\u00b0C',
-            font=_FONT_MD,
-            fill='white',
+        temp = '--' if sy.cpu_temp is None else f'{sy.cpu_temp:.0f}'
+        self._header(draw, 'System', f'v{__version__}', True)
+        self._value_row(
+            draw, 14, 'CPU:', f'{sy.cpu_percent:.0f}% {temp}\u00b0C',
         )
-        draw.text(
-            (0, 30),
-            f'RAM: {sy.ram_used_mb}/{sy.ram_total_mb}MB',
-            font=_FONT_MD,
-            fill='white',
+        self._value_row(
+            draw, 27, 'RAM:', f'{sy.ram_used_mb}/{sy.ram_total_mb}MB',
         )
-        draw.text(
-            (0, 43),
-            f'Disk:{sy.disk_used_gb}/{sy.disk_total_gb}GB',
-            font=_FONT_MD,
-            fill='white',
+        self._value_row(
+            draw, 40, 'Disk:', f'{sy.disk_used_gb}/{sy.disk_total_gb}GB',
         )
-        self._nav_hint(draw)
+        self._nav_hint(draw, 'Menu')
 
     def _screen_status(self, draw):
         sy = self._data.system
@@ -457,12 +454,12 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
     # ── Menu renderer ────────────────────────────────────────
 
     def _render_menu(self, draw):
-        draw.text((0, 0), 'Action:', font=_FONT_SM, fill='white')
-        # Scroll indicator
-        total = len(self._menu_items)
+        draw.text((0, 0), self._menu_title, font=_FONT_SM, fill='white')
+        # Scroll indicator, right-aligned
+        counter = f'{self._menu_sel + 1}/{len(self._menu_items)}'
         draw.text(
-            (45, 0),
-            f'{self._menu_sel + 1}/{total}',
+            (self.W - int(_FONT_SM.getlength(counter)), 0),
+            counter,
             font=_FONT_SM,
             fill='white',
         )
@@ -482,11 +479,8 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             fill='white',
             width=1,
         )
-        draw.text(
-            (0, self.H - 9),
-            '[^][v] Nav  [#]OK  [*]Back',
-            font=_FONT_SM,
-            fill='white',
+        self._hint_text(
+            draw, self.H - 9, '[\u2191][\u2193] Nav [#]OK [*]Back',
         )
 
     # ── Message renderer ─────────────────────────────────────
