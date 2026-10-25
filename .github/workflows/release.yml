@@ -63,7 +63,11 @@ jobs:
           COPYFILE_DISABLE=1 tar \
             --exclude='__pycache__' --exclude='._*' \
             -czf "dist/${name}.tar.gz" -C dist "${name}"
-          sha256sum "dist/${name}.tar.gz" | tee "dist/${name}.tar.gz.sha256"
+          # Run inside dist/, so the file records a bare filename: someone
+          # who downloads both into one directory can just run
+          # `sha256sum -c pihole-display-<version>.tar.gz.sha256`.
+          (cd dist && sha256sum "${name}.tar.gz" \
+                      | tee "${name}.tar.gz.sha256")
           echo "archive=dist/${name}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Build changelog

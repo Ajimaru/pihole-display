@@ -8,6 +8,14 @@ OLED display controller for a **BeagleBone Black** running **Pi-hole** and **Unb
 Shows DNS filter statistics, system info and allows basic control via 4 hardware buttons —
 or from a browser, through a built-in web UI that mirrors the display.
 
+[![Release](https://img.shields.io/github/v/release/Ajimaru/pihole-display?sort=semver&style=flat-square&logo=github)](https://github.com/Ajimaru/pihole-display/releases/latest)
+[![Release workflow](https://img.shields.io/github/actions/workflow/status/Ajimaru/pihole-display/release.yml?style=flat-square&logo=githubactions&logoColor=white&label=release)](https://github.com/Ajimaru/pihole-display/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/github/downloads/Ajimaru/pihole-display/total?style=flat-square&logo=github)](https://github.com/Ajimaru/pihole-display/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-%E2%89%A53.10-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-BeagleBone%20Black-green?style=flat-square&logo=linux&logoColor=white)](https://www.beagleboard.org/boards/beaglebone-black)
+[![Pi-hole](https://img.shields.io/badge/Pi--hole-v6-%23f60d1a?style=flat-square&logo=pi-hole&logoColor=white)](https://pi-hole.net/)
+
 ## Hardware
 
 - Component: SBC
@@ -43,7 +51,7 @@ up and K1 is down.
 
 - Pi-hole
   Description: Block %, queries, clients
-  Action key (#): Pause / disable / gravity menu
+  Action key (#): Pause / disable / gravity / flush cache menu
 - Unbound
   Description: Cache hit %, Q/s, total
   Action key (#): Cache / restart menu
@@ -99,11 +107,16 @@ hardware buttons into clickable ones. It is reachable on port 8080 per default:
 http://<BBB_IP_ADDRESS>:8080
 ```
 
-The page shows the live display, scaled up, and the buttons in their physical
-order K1–K4. Pressing and holding works like it does on the board: the server
-measures how long a button is held and classifies it with the same thresholds
-as the GPIO handler, so short press, long press and the 5-second hold to wake
-a locked screen all behave identically.
+The page shows the live display, scaled up, with the four keys down its right
+side. They are ordered by what they do — up above down — and each keeps its
+board marking, so the top key reads `K2` because the display is mounted
+upside down.
+
+Pressing and holding works like it does on the board: the server measures how
+long a key is held and classifies it with the same thresholds as the GPIO
+handler, so short press, long press and the 5-second hold to wake a locked
+screen all behave identically. Below 560 px the keys move under the display
+into a row.
 
 ### First login
 
@@ -115,6 +128,12 @@ Password: pihole
 **The password must be changed on first login** — no other page is reachable
 until it is. Until then, the service logs a warning on every start and the web
 page shows a warning banner.
+
+The user name is matched without regard to case, and leading or trailing
+spaces are stripped from both fields, so a pasted password does not fail over
+an invisible space. While the default password is still set, the login form
+asks the browser not to autofill it — a saved password from an earlier install
+otherwise looks like a wrong one.
 
 ### Security
 
@@ -308,7 +327,11 @@ echo "Installing v${VERSION}"
 BASE="https://github.com/${REPO}/releases/download/v${VERSION}"
 curl -fsSLO "${BASE}/pihole-display-${VERSION}.tar.gz"
 curl -fsSLO "${BASE}/pihole-display-${VERSION}.tar.gz.sha256"
-sha256sum -c "pihole-display-${VERSION}.tar.gz.sha256"
+# Compare the hash itself, so this works regardless of the path the
+# checksum file records.
+[ "$(awk '{print $1}' "pihole-display-${VERSION}.tar.gz.sha256")" \
+  = "$(sha256sum "pihole-display-${VERSION}.tar.gz" | awk '{print $1}')" ] \
+  && echo "checksum OK" || echo "CHECKSUM MISMATCH"
 
 tar -xzf "pihole-display-${VERSION}.tar.gz"
 cd "pihole-display-${VERSION}"
