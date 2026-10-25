@@ -16,6 +16,16 @@ or from a browser, through a built-in web UI that mirrors the display.
 [![Platform](https://img.shields.io/badge/platform-BeagleBone%20Black-green?style=flat-square&logo=linux&logoColor=white)](https://www.beagleboard.org/boards/beaglebone-black)
 [![Pi-hole](https://img.shields.io/badge/Pi--hole-v6-%23f60d1a?style=flat-square&logo=pi-hole&logoColor=white)](https://pi-hole.net/)
 
+## Features
+
+- Five screens: Pi-hole stats, Unbound cache, network, system health, service status
+- Control from four hardware buttons: pause or disable blocking, update gravity,
+  flush caches, restart services, reboot or shut down
+- Built-in web UI that mirrors the display and makes the buttons clickable,
+  behind a login
+- Flags available Pi-hole updates and can install them
+- Screen lock and sleep timeout, both configurable
+
 ## Hardware
 
 - Component: SBC
@@ -46,253 +56,6 @@ The display is mounted rotated by 180° (`DISPLAY_ROTATE = 2`), so K2 is
 up and K1 is down.
 
 **-> Detailed wiring guide with perfboard adapter: [docs/WIRING_GUIDE.md](docs/WIRING_GUIDE.md)**
-
-## Screens
-
-- Pi-hole
-  Description: Block %, queries, clients
-  Action key (#): Pause / disable / gravity / flush cache menu
-- Unbound
-  Description: Cache hit %, Q/s, total
-  Action key (#): Cache / restart menu
-- Network
-  Description: IP, gateway, hostname, uptime
-  Action key (#): -
-- System
-  Description: CPU %, temp, RAM, disk (temp shows `--` without a sensor,
-  the BBB kernel has none)
-  Action key (#): Reboot / shutdown / screen lock menu
-- Status
-  Description: Service health overview, plus `update` next to Pi-hole when
-  a newer Core, Web or FTL release is out
-  Action key (#): Actions menu, including `Update Pi-hole` when one is
-  available
-
-### Button layout
-
-```text
-K2 (^)  short  → previous screen / menu up
-K1 (v)  short  → next screen     / menu down
-K3 (#)  short  → open action menu / confirm
-K4 (*)  short  → home screen     / cancel
-K2 (^)  long   → force data refresh
-K1 (v)  long   → toggle display sleep
-K4 (*)  long   → home screen
-K4 (*)  hold 5s → wake the display while the screen lock is on
-```
-
-The display sleeps after `DISPLAY_TIMEOUT` without input. Any button
-wakes it, unless the screen lock is on: then only holding * for 5 seconds
-does. Long running actions such as a Pi-hole update hold it on until they
-finish, so the screen never blanks mid-update. The System menu (#) offers reboot, shutdown and the screen lock
-toggle, each with a yes/no confirmation. The lock setting is kept in
-`/var/lib/pihole-display/state.json`.
-
-## Pi-hole updates
-
-The Status screen shows `update` next to Pi-hole when Core, Web or FTL has a
-newer release, the same information the admin page puts in its footer. It is
-read from `GET /api/info/version` once an hour (`UPDATE_CHECK_INTERVAL`),
-since versions rarely change.
-
-When an update is available, the Status action menu (`#`) gains an
-`Update Pi-hole` entry that runs `pihole -up` after a yes/no prompt.
-
-## Web UI
-
-The service runs a small web server that mirrors the OLED and turns the four
-hardware buttons into clickable ones. It is reachable on port 8080 per default:
-
-```text
-http://<BBB_IP_ADDRESS>:8080
-```
-
-The page shows the live display, scaled up, with the four keys down its right
-side. They are ordered by what they do — up above down — and each keeps its
-board marking, so the top key reads `K2` because the display is mounted
-upside down.
-
-Pressing and holding works like it does on the board: the server measures how
-long a key is held and classifies it with the same thresholds as the GPIO
-handler, so short press, long press and the 5-second hold to wake a locked
-screen all behave identically. Below 560 px the keys move under the display
-into a row.
-
-### First login
-
-```text
-Username: admin
-Password: pihole
-```
-
-**The password must be changed on first login** — no other page is reachable
-until it is. Until then, the service logs a warning on every start and the web
-page shows a warning banner.
-
-The user name is matched without regard to case, and leading or trailing
-spaces are stripped from both fields, so a pasted password does not fail over
-an invisible space. While the default password is still set, the login form
-asks the browser not to autofill it — a saved password from an earlier install
-otherwise looks like a wrong one.
-
-### Security
-
-- **The connection is plain HTTP.** The password is sent across the network in
-  the clear. This is meant for a trusted home LAN. Over anything else, use an
-  SSH tunnel and bind to localhost (see below).
-- The default password `admin` / `pihole` is public — it is in this README.
-  Change it immediately, and do not expose port 8080 to the internet.
-- Passwords are stored as PBKDF2-SHA256 hashes (200,000 iterations, random
-  salt) in `/var/lib/pihole-display/web_auth.json`, mode `0600`.
-- Sessions are kept in memory only, so restarting the service logs everyone out.
-- After 5 failed logins an IP is locked out for 60 seconds.
-
-To restrict access to an SSH tunnel, set `WEB_HOST = '127.0.0.1'` in
-`config.py` and connect with:
-
-```bash
-ssh -L 8080:localhost:8080 <user>@<BBB_IP_ADDRESS>
-```
-
-To turn the web UI off entirely, set `WEB_ENABLED = False`.
-
-The systemd unit is hardened (`ProtectHome`, `PrivateTmp`,
-`ProtectKernelTunables`, `RestrictAddressFamilies`), but deliberately does
-**not** set `NoNewPrivileges` or `RestrictSUIDSGID`: `pihole -up` drops to
-the `pihole` user and uses setuid `sudo` to get back to root. With either
-flag on, the update aborts after stopping FTL and leaves the network without
-DNS.
-
-## Mockups
-
-> All screens rendered at 4× scale (actual display: 128×64 px)
-
-<details>
-<summary>Show all screen mockups</summary>
-
-### Main screens
-
-- Splash:
-
-  ![Splash](docs/mockups/00_splash.png)
-
-- Pi-hole active:
-
-  ![Pi-hole active](docs/mockups/01_pihole_active.png)
-
-- Pi-hole paused:
-
-  ![Pi-hole paused](docs/mockups/02_pihole_pause.png)
-
-- Pi-hole off:
-
-  ![Pi-hole off](docs/mockups/03_pihole_off.png)
-
-- Unbound:
-
-  ![Unbound](docs/mockups/04_unbound.png)
-
-- Unbound (error):
-
-  ![Unbound (error)](docs/mockups/05_unbound_error.png)
-
-- Network:
-
-  ![Network](docs/mockups/06_network.png)
-
-- System:
-
-  ![System](docs/mockups/07_system.png)
-
-- Status:
-
-  ![Status](docs/mockups/08_status_ok.png)
-
-- Status (error):
-
-  ![Status (error)](docs/mockups/09_status_error.png)
-
-- Status (update available):
-
-  ![Status (update available)](docs/mockups/09b_status_update.png)
-
-### Menus
-
-- Pi-hole menu:
-
-  ![Pi-hole menu](docs/mockups/10_menu_pihole_active.png)
-
-- Pi-hole menu (scrolled):
-
-  ![Pi-hole menu (scrolled)](docs/mockups/11_menu_pihole_scroll.png)
-
-- Pi-hole menu (off):
-
-  ![Pi-hole menu (off)](docs/mockups/12_menu_pihole_off.png)
-
-- Unbound menu:
-
-  ![Unbound menu](docs/mockups/13_menu_unbound.png)
-
-- Status actions:
-
-  ![Status actions](docs/mockups/14_menu_status_actions.png)
-
-- Status actions (scrolled):
-
-  ![Status actions (scrolled)](docs/mockups/14b_menu_status_scrolled.png)
-
-- Status actions (update available):
-
-  ![Status actions with update](docs/mockups/14e_menu_status_update.png)
-
-- System menu:
-
-  ![System menu](docs/mockups/14c_menu_system.png)
-
-- Confirmation (reboot):
-
-  ![Confirmation (reboot)](docs/mockups/14d_confirm_reboot.png)
-
-### Status messages
-
-- Pause:
-
-  ![Pause](docs/mockups/15_message_pause.png)
-
-- Active:
-
-  ![Active](docs/mockups/16_message_active.png)
-
-- Off:
-
-  ![Off](docs/mockups/17_message_off.png)
-
-- Flush:
-
-  ![Flush](docs/mockups/18_message_flush.png)
-
-- Gravity update:
-
-  ![Gravity update](docs/mockups/19_message_gravity_update.png)
-
-- Reboot:
-
-  ![Reboot](docs/mockups/19b_message_reboot.png)
-
-- Screen lock on:
-
-  ![Screen lock on](docs/mockups/19c_message_lock_on.png)
-
-- Updating:
-
-  ![Updating](docs/mockups/19d_message_updating.png)
-
-- Update done:
-
-  ![Update done](docs/mockups/19e_message_update_ok.png)
-
-</details>
 
 ## Enclosure
 
@@ -373,6 +136,128 @@ sudo cp /etc/unbound/unbound.conf.d/remote-control.conf.dpkg-dist \
 sudo unbound-checkconf && sudo systemctl restart unbound
 ```
 
+## Usage
+
+Once the service runs, the display cycles through five screens. Each one has
+an action menu behind the `#` key, and anything reachable there is also
+reachable from the [web UI](#web-ui).
+
+### Screens
+
+- Pi-hole
+  Description: Block %, queries, clients
+  Action key (#): Pause / disable / gravity / flush cache menu
+- Unbound
+  Description: Cache hit %, Q/s, total
+  Action key (#): Cache / restart menu
+- Network
+  Description: IP, gateway, hostname, uptime
+  Action key (#): -
+- System
+  Description: CPU %, temp, RAM, disk (temp shows `--` without a sensor,
+  the BBB kernel has none)
+  Action key (#): Reboot / shutdown / screen lock menu
+- Status
+  Description: Service health overview, plus `update` next to Pi-hole when
+  a newer Core, Web or FTL release is out
+  Action key (#): Actions menu, including `Update Pi-hole` when one is
+  available
+
+#### Button layout
+
+```text
+K2 (^)  short  → previous screen / menu up
+K1 (v)  short  → next screen     / menu down
+K3 (#)  short  → open action menu / confirm
+K4 (*)  short  → home screen     / cancel
+K2 (^)  long   → force data refresh
+K1 (v)  long   → toggle display sleep
+K4 (*)  long   → home screen
+K4 (*)  hold 5s → wake the display while the screen lock is on
+```
+
+The display sleeps after `DISPLAY_TIMEOUT` without input. Any button
+wakes it, unless the screen lock is on: then only holding * for 5 seconds
+does. Long running actions such as a Pi-hole update hold it on until they
+finish, so the screen never blanks mid-update. The System menu (#) offers reboot, shutdown and the screen lock
+toggle, each with a yes/no confirmation. The lock setting is kept in
+`/var/lib/pihole-display/state.json`.
+
+### Pi-hole updates
+
+The Status screen shows `update` next to Pi-hole when Core, Web or FTL has a
+newer release, the same information the admin page puts in its footer. It is
+read from `GET /api/info/version` once an hour (`UPDATE_CHECK_INTERVAL`),
+since versions rarely change.
+
+When an update is available, the Status action menu (`#`) gains an
+`Update Pi-hole` entry that runs `pihole -up` after a yes/no prompt.
+
+## Web UI
+
+The service runs a small web server that mirrors the OLED and turns the four
+hardware buttons into clickable ones. It is reachable on port 8080 per default:
+
+```text
+http://<BBB_IP_ADDRESS>:8080
+```
+
+The page shows the live display, scaled up, with the four keys down its right
+side. They are ordered by what they do — up above down — and each keeps its
+board marking, so the top key reads `K2` because the display is mounted
+upside down.
+
+Pressing and holding works like it does on the board: the server measures how
+long a key is held and classifies it with the same thresholds as the GPIO
+handler, so short press, long press and the 5-second hold to wake a locked
+screen all behave identically. Below 560 px the keys move under the display
+into a row.
+
+### First login
+
+```text
+Username: admin
+Password: pihole
+```
+
+**The password must be changed on first login** — no other page is reachable
+until it is. Until then, the service logs a warning on every start and the web
+page shows a warning banner.
+
+The user name is matched without regard to case, and leading or trailing
+spaces are stripped from both fields, so a pasted password does not fail over
+an invisible space. While the default password is still set, the login form
+asks the browser not to autofill it — a saved password from an earlier install
+otherwise looks like a wrong one.
+
+### Security
+
+- **The connection is plain HTTP.** The password is sent across the network in
+  the clear. This is meant for a trusted home LAN. Over anything else, use an
+  SSH tunnel and bind to localhost (see below).
+- The default password `admin` / `pihole` is public — it is in this README.
+  Change it immediately, and do not expose port 8080 to the internet.
+- Passwords are stored as PBKDF2-SHA256 hashes (200,000 iterations, random
+  salt) in `/var/lib/pihole-display/web_auth.json`, mode `0600`.
+- Sessions are kept in memory only, so restarting the service logs everyone out.
+- After 5 failed logins an IP is locked out for 60 seconds.
+
+To restrict access to an SSH tunnel, set `WEB_HOST = '127.0.0.1'` in
+`config.py` and connect with:
+
+```bash
+ssh -L 8080:localhost:8080 <user>@<BBB_IP_ADDRESS>
+```
+
+To turn the web UI off entirely, set `WEB_ENABLED = False`.
+
+The systemd unit is hardened (`ProtectHome`, `PrivateTmp`,
+`ProtectKernelTunables`, `RestrictAddressFamilies`), but deliberately does
+**not** set `NoNewPrivileges` or `RestrictSUIDSGID`: `pihole -up` drops to
+the `pihole` user and uses setuid `sudo` to get back to root. With either
+flag on, the update aborts after stopping FTL and leaves the network without
+DNS.
+
 ## Configuration
 
 Edit `pihole-display/config.py` before installation, or later
@@ -400,7 +285,9 @@ WEB_SCALE        = 4           # Display zoom in the browser
 With `PIHOLE_PASSWORD` empty, the service logs in with Pi-hole's local CLI
 password file, so no password has to be stored in `config.py`.
 
-## Project structure
+## Development
+
+### Project structure
 
 ```text
 pihole-display/
@@ -430,6 +317,169 @@ scripts/
 stl/
 └── BBB_Cover.stl          — printable cover around the OLED display
 ```
+
+### Releases
+
+A release is cut by pushing a tag. `scripts/release.sh` sets `version.py`,
+commits and tags in one step, so the tag and the version the display shows
+can never drift apart:
+
+```bash
+./scripts/release.sh 0.2.0 --dry-run   # show what it would do
+./scripts/release.sh 0.2.0             # set version, commit, tag
+git push origin main v0.2.0            # this publishes the release
+```
+
+Pushing the tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml),
+which refuses to build if the tag and `version.py` disagree, then packs
+`pihole-display-<version>.tar.gz` with the modules, `install.sh`, the
+systemd unit, the licenses and the wiring guide, adds a `.sha256` next to
+it, and publishes a GitHub release. The notes are grouped from the commit
+subjects by their Conventional Commits prefix (`feat:`, `fix:`, `docs:`,
+…); anything without a prefix is listed under "Other", and a `!` marks a
+breaking change.
+
+To preview the notes before tagging:
+
+```bash
+git log --no-merges --pretty=$'%s\t%h' v0.1.0..HEAD |
+  VERSION=0.2.0 python3 scripts/changelog.py
+```
+
+### Screen gallery
+
+Rendered by [`docs/generate_mockups.py`](docs/generate_mockups.py), which
+drives the real `DisplayManager` against a dummy device. Run it on the board
+(it needs luma and the DejaVu fonts) after changing anything a screen shows.
+
+> All screens rendered at 4× scale (actual display: 128×64 px)
+
+<details>
+<summary>Show all screen mockups</summary>
+
+#### Main screens
+
+- Splash:
+
+  ![Splash](docs/mockups/00_splash.png)
+
+- Pi-hole active:
+
+  ![Pi-hole active](docs/mockups/01_pihole_active.png)
+
+- Pi-hole paused:
+
+  ![Pi-hole paused](docs/mockups/02_pihole_pause.png)
+
+- Pi-hole off:
+
+  ![Pi-hole off](docs/mockups/03_pihole_off.png)
+
+- Unbound:
+
+  ![Unbound](docs/mockups/04_unbound.png)
+
+- Unbound (error):
+
+  ![Unbound (error)](docs/mockups/05_unbound_error.png)
+
+- Network:
+
+  ![Network](docs/mockups/06_network.png)
+
+- System:
+
+  ![System](docs/mockups/07_system.png)
+
+- Status:
+
+  ![Status](docs/mockups/08_status_ok.png)
+
+- Status (error):
+
+  ![Status (error)](docs/mockups/09_status_error.png)
+
+- Status (update available):
+
+  ![Status (update available)](docs/mockups/09b_status_update.png)
+
+#### Menus
+
+- Pi-hole menu:
+
+  ![Pi-hole menu](docs/mockups/10_menu_pihole_active.png)
+
+- Pi-hole menu (scrolled):
+
+  ![Pi-hole menu (scrolled)](docs/mockups/11_menu_pihole_scroll.png)
+
+- Pi-hole menu (off):
+
+  ![Pi-hole menu (off)](docs/mockups/12_menu_pihole_off.png)
+
+- Unbound menu:
+
+  ![Unbound menu](docs/mockups/13_menu_unbound.png)
+
+- Status actions:
+
+  ![Status actions](docs/mockups/14_menu_status_actions.png)
+
+- Status actions (scrolled):
+
+  ![Status actions (scrolled)](docs/mockups/14b_menu_status_scrolled.png)
+
+- Status actions (update available):
+
+  ![Status actions with update](docs/mockups/14e_menu_status_update.png)
+
+- System menu:
+
+  ![System menu](docs/mockups/14c_menu_system.png)
+
+- Confirmation (reboot):
+
+  ![Confirmation (reboot)](docs/mockups/14d_confirm_reboot.png)
+
+#### Status messages
+
+- Pause:
+
+  ![Pause](docs/mockups/15_message_pause.png)
+
+- Active:
+
+  ![Active](docs/mockups/16_message_active.png)
+
+- Off:
+
+  ![Off](docs/mockups/17_message_off.png)
+
+- Flush:
+
+  ![Flush](docs/mockups/18_message_flush.png)
+
+- Gravity update:
+
+  ![Gravity update](docs/mockups/19_message_gravity_update.png)
+
+- Reboot:
+
+  ![Reboot](docs/mockups/19b_message_reboot.png)
+
+- Screen lock on:
+
+  ![Screen lock on](docs/mockups/19c_message_lock_on.png)
+
+- Updating:
+
+  ![Updating](docs/mockups/19d_message_updating.png)
+
+- Update done:
+
+  ![Update done](docs/mockups/19e_message_update_ok.png)
+
+</details>
 
 ## Dependencies
 
@@ -461,34 +511,12 @@ already needed for rendering.
 System packages (installed by `install.sh`): `python3-venv`,
 `python3-libgpiod`, `gpiod`, `i2c-tools`, `libi2c-dev`, `fonts-dejavu-core`
 
-## Releases
-
-A release is cut by pushing a tag. `scripts/release.sh` sets `version.py`,
-commits and tags in one step, so the tag and the version the display shows
-can never drift apart:
-
-```bash
-./scripts/release.sh 0.2.0 --dry-run   # show what it would do
-./scripts/release.sh 0.2.0             # set version, commit, tag
-git push origin main v0.2.0            # this publishes the release
-```
-
-Pushing the tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml),
-which refuses to build if the tag and `version.py` disagree, then packs
-`pihole-display-<version>.tar.gz` with the modules, `install.sh`, the
-systemd unit, the licenses and the wiring guide, adds a `.sha256` next to
-it, and publishes a GitHub release. The notes are grouped from the commit
-subjects by their Conventional Commits prefix (`feat:`, `fix:`, `docs:`,
-…); anything without a prefix is listed under "Other", and a `!` marks a
-breaking change.
-
-To preview the notes before tagging:
-
-```bash
-git log --no-merges --pretty=$'%s\t%h' v0.1.0..HEAD |
-  VERSION=0.2.0 python3 scripts/changelog.py
-```
+Full attribution for each of these is in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).
+
+The libraries this project builds on carry their own licenses, listed in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
