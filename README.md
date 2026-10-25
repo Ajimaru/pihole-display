@@ -5,7 +5,8 @@
 </p>
 
 OLED display controller for a **BeagleBone Black** running **Pi-hole** and **Unbound**.  
-Shows DNS filter statistics, system info and allows basic control via 4 hardware buttons.
+Shows DNS filter statistics, system info and allows basic control via 4 hardware buttons —
+or from a browser, through a built-in web UI that mirrors the display.
 
 ## Hardware
 
@@ -75,6 +76,53 @@ wakes it, unless the screen lock is on: then only holding * for 5 seconds
 does. The System menu (#) offers reboot, shutdown and the screen lock
 toggle, each with a yes/no confirmation. The lock setting is kept in
 `/var/lib/pihole-display/state.json`.
+
+## Web UI
+
+The service runs a small web server that mirrors the OLED and turns the four
+hardware buttons into clickable ones. It is reachable on port 8080 per default:
+
+```text
+http://<BBB_IP_ADDRESS>:8080
+```
+
+The page shows the live display, scaled up, and the buttons in their physical
+order K1–K4. Pressing and holding works like it does on the board: the server
+measures how long a button is held and classifies it with the same thresholds
+as the GPIO handler, so short press, long press and the 5-second hold to wake
+a locked screen all behave identically.
+
+### First login
+
+```text
+Username: admin
+Password: pihole
+```
+
+**The password must be changed on first login** — no other page is reachable
+until it is. Until then, the service logs a warning on every start and the web
+page shows a warning banner.
+
+### Security
+
+- **The connection is plain HTTP.** The password is sent across the network in
+  the clear. This is meant for a trusted home LAN. Over anything else, use an
+  SSH tunnel and bind to localhost (see below).
+- The default password `admin` / `pihole` is public — it is in this README.
+  Change it immediately, and do not expose port 8080 to the internet.
+- Passwords are stored as PBKDF2-SHA256 hashes (200,000 iterations, random
+  salt) in `/var/lib/pihole-display/web_auth.json`, mode `0600`.
+- Sessions are kept in memory only, so restarting the service logs everyone out.
+- After 5 failed logins an IP is locked out for 60 seconds.
+
+To restrict access to an SSH tunnel, set `WEB_HOST = '127.0.0.1'` in
+`config.py` and connect with:
+
+```bash
+ssh -L 8080:localhost:8080 <user>@<BBB_IP_ADDRESS>
+```
+
+To turn the web UI off entirely, set `WEB_ENABLED = False`.
 
 ## Mockups
 
@@ -227,6 +275,9 @@ sudo systemctl start pihole-display
 sudo journalctl -u pihole-display -f
 ```
 
+The web UI is then available at `http://<BBB_IP_ADDRESS>:8080` — log in with
+`admin` / `pihole` and change the password straight away (see [Web UI](#web-ui)).
+
 The Unbound screen reads its stats with `unbound-control`, which Debian ships
 disabled. `install.sh` offers to enable it (this restarts Unbound, so DNS is
 briefly unavailable for the network). To do it manually, through a local
@@ -253,6 +304,12 @@ PIHOLE_PASSWORD  = ''          # Pi-hole v6; empty = log in with /etc/pihole/cli
 REFRESH_INTERVAL = 10          # seconds
 DISPLAY_TIMEOUT  = 60          # seconds until sleep (0 = never)
 HOLD_MS          = 5000        # hold * this long to wake a locked display
+
+WEB_ENABLED      = True        # False disables the web UI entirely
+WEB_HOST         = '0.0.0.0'   # '127.0.0.1' = local only (SSH tunnel)
+WEB_PORT         = 8080        # Pi-hole admin already uses :80
+WEB_USER         = 'admin'     # Login name
+WEB_SCALE        = 4           # Display zoom in the browser
 ```
 
 With `PIHOLE_PASSWORD` empty, the service logs in with Pi-hole's local CLI
@@ -266,6 +323,9 @@ pihole-display/
 ├── data.py                — Pi-hole API v5/v6, Unbound, system stats
 ├── display_manager.py     — OLED screens + menu system (luma.oled)
 ├── button_handler.py      — GPIO buttons (gpiod v2 + sysfs fallback)
+├── web_server.py          — web UI: display mirror + clickable buttons
+├── web_auth.py            — login, PBKDF2 passwords, sessions
+├── web_ui.py              — HTML/CSS/JS for the web UI (served inline)
 ├── main.py                — main loop + event handling
 ├── version.py             — version number (shown in the System header)
 ├── requirements.txt       — Python dependencies
@@ -304,6 +364,10 @@ stl/
   Version: system
   License: LGPL-2.1
   Purpose: GPIO button reading
+
+The web UI adds no dependency: it is built entirely on the Python standard
+library (`http.server`, `hashlib`, `secrets`) and reuses Pillow, which is
+already needed for rendering.
 
 System packages (installed by `install.sh`): `python3-venv`,
 `python3-libgpiod`, `gpiod`, `i2c-tools`, `libi2c-dev`, `fonts-dejavu-core`

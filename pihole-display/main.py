@@ -47,7 +47,31 @@ class App:  # pylint: disable=too-few-public-methods
         self._buttons = ButtonHandler(self._on_button)
         self._running = False
         self._data_lock = threading.Lock()
+        # _on_button is called from the GPIO thread and from the web
+        # server's request threads, and it mutates display state.
+        self._input_lock = threading.Lock()
         self._screen_lock = self._load_state().get('screen_lock', False)
+        self._web = self._setup_web()
+
+    def _setup_web(self):
+        """Create the web server, or None when it is disabled or broken."""
+        if not getattr(config, 'WEB_ENABLED', False):
+            return None
+        try:
+            # Imported here so a disabled web UI costs nothing at all.
+            from web_auth import AuthManager      # pylint: disable=C0415
+            from web_server import WebServer      # pylint: disable=C0415
+
+            auth = AuthManager(config.WEB_AUTH_FILE)
+            if auth.is_default_password():
+                log.warning(
+                    'Web UI still uses the default password - change it at '
+                    'http://<host>:%d/', config.WEB_PORT,
+                )
+            return WebServer(self._display, self._on_button, auth)
+        except Exception as e:  # pylint: disable=broad-except
+            log.error('Web server setup failed: %s', e)
+            return None
 
     # ── Persistent state ─────────────────────────────────────
 
@@ -83,6 +107,13 @@ class App:  # pylint: disable=too-few-public-methods
 
         self._buttons.start()
 
+        if self._web:
+            try:
+                self._web.start()
+            except OSError as e:
+                log.error('Web server could not start: %s', e)
+                self._web = None
+
         # Signal handlers
         signal.signal(signal.SIGTERM, self._shutdown)
         signal.signal(signal.SIGINT,  self._shutdown)
@@ -109,13 +140,21 @@ class App:  # pylint: disable=too-few-public-methods
 
     def _cleanup(self):
         self._buttons.stop()
+        # Stop serving before the display goes away, or an in-flight
+        # request could touch a device that is already released.
+        if self._web:
+            self._web.stop()
         self._display.cleanup()
         log.info('Stopped')
 
     # ── Button handler ───────────────────────────────────────
 
     def _on_button(self, event: ButtonEvent):
-        """Called from the button thread - keep it fast."""
+        """Called from the button thread and from web requests - be fast."""
+        with self._input_lock:
+            self._dispatch_button(event)
+
+    def _dispatch_button(self, event: ButtonEvent):
         mode = self._display.mode
 
         # Wake display on every button press, or only on holding * while

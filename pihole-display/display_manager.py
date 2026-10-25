@@ -124,6 +124,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         self._msg_text = ''
         self._msg_until = 0.0
         self._last_input = time.monotonic()
+        self._frame_sink: Optional[Callable] = None
 
     def _init_device(self):
         """Initialize the OLED device using configured I2C settings."""
@@ -160,6 +161,45 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
     def wake(self):
         """Public wrapper to wake display and reset inactivity timer."""
         self._wake()
+
+    def set_frame_sink(self, sink: Optional[Callable]):
+        """Register a callback receiving every rendered frame.
+
+        Used by the web server to mirror the display. None is passed while
+        the display sleeps. Kept deliberately cheap: the sink only takes a
+        copy of the image, any encoding happens when a browser asks.
+        """
+        self._frame_sink = sink
+
+    def _publish_frame(self, draw):
+        """Hand the current frame to the sink, never breaking rendering.
+
+        Takes the ImageDraw from the canvas, not an image: luma's canvas
+        keeps the PIL.Image on the draw object as ``_image``, while the
+        public ``im`` is a raw ImagingCore that PIL cannot copy or encode.
+        Pass None to publish a blank frame while the display sleeps.
+
+        The live image is passed through without copying - the canvas
+        discards it right after anyway, and the sink copies only the
+        frames it keeps, which at ~10 fps is very few of them.
+        """
+        sink = self._frame_sink
+        if sink is None:
+            return
+        try:
+            image = None
+            if draw is not None:
+                image = getattr(draw, '_image', None)
+                if image is None:
+                    # luma changed its internals - mirror a blank frame
+                    # rather than guessing at a replacement.
+                    log.debug('Canvas exposes no _image, frame skipped')
+                    return
+            sink(image)
+        except Exception as e:  # pylint: disable=broad-except
+            # A broken mirror must never disturb the physical display.
+            # debug, not error: at ~10 fps this would flood the journal.
+            log.debug('Frame sink error: %s', e)
 
     def next_screen(self):
         """Switch to the next screen in cyclic order."""
@@ -225,6 +265,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
                 (10, 37), 'Pi-hole + Unbound', font=_FONT_SM, fill='white',
             )
             draw.text((20, 50), 'Loading data...', font=_FONT_SM, fill='white')
+            self._publish_frame(draw)
         self._wake()
 
     def show_message(self, text: str, duration: float = 2.0):
@@ -247,14 +288,17 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         now = time.monotonic()
 
         if self._enter_sleep_on_timeout(now):
+            self._publish_frame(None)
             return
 
         self._handle_message_timeout(now)
         if self._mode == UIMode.SLEEP:
+            self._publish_frame(None)
             return
 
         with canvas(self._device) as draw:
             self._render_mode(draw)
+            self._publish_frame(draw)
 
     def _enter_sleep_on_timeout(self, now: float) -> bool:
         """Put display to sleep when inactivity timeout is reached."""

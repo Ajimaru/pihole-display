@@ -13,5 +13,22 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
+# Creates /var/lib/pihole-display with sane ownership for state.json
+# and the web password file.
+StateDirectory=pihole-display
+
+# The service needs root for GPIO, I2C, systemctl and /etc/pihole/cli_pw,
+# and it now listens on a network port - so fence in what it does not need.
+# ProtectSystem=strict is deliberately absent: `pihole restartdns` and
+# `systemctl` would need so many exceptions that it stops being useful.
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# AF_NETLINK is required by psutil for network interface data.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
 [Install]
 WantedBy=multi-user.target

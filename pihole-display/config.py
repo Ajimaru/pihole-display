@@ -44,3 +44,14 @@ PAUSE_OPTIONS = [
     ('30 Min', 30 * 60),
     ('1 Hour', 60 * 60),
 ]
+
+# --- Webserver (OLED mirror + clickable buttons) ---
+WEB_ENABLED = True          # False disables the web UI entirely
+WEB_HOST = '0.0.0.0'        # '127.0.0.1' = local only (SSH tunnel)
+WEB_PORT = 8080             # Pi-hole admin already uses :80
+WEB_USER = 'admin'          # Login name
+WEB_AUTH_FILE = '/var/lib/pihole-display/web_auth.json'
+WEB_SESSION_HOURS = 168     # Session lifetime (7 days)
+WEB_MAX_ATTEMPTS = 5        # Failed logins before lockout
+WEB_LOCKOUT_SEC = 60        # Lockout duration per IP
+WEB_SCALE = 4               # Display zoom in the browser (128x64 -> 512x256)
