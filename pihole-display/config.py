@@ -26,9 +26,13 @@ PIHOLE_SETUPVARS = '/etc/pihole/setupVars.conf'
 # password file (needs root, which the service runs as).
 PIHOLE_PASSWORD = ''
 PIHOLE_CLI_PW = '/etc/pihole/cli_pw'
+# Pi-hole writes the installed component versions here; read directly so
+# an update can be verified while FTL is restarting and the API is down.
+PIHOLE_VERSIONS = '/etc/pihole/versions'
 
 # --- Timing ---
 REFRESH_INTERVAL = 10    # Seconds between data refreshes
+UPDATE_CHECK_INTERVAL = 3600  # Seconds between Pi-hole update checks
 DISPLAY_TIMEOUT = 60    # Seconds until display sleeps (0 = never)
 DEBOUNCE_MS = 200   # Debounce time in milliseconds
 LONG_PRESS_MS = 1500  # Long press threshold in milliseconds

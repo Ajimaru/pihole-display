@@ -55,8 +55,10 @@ up and K1 is down.
   the BBB kernel has none)
   Action key (#): Reboot / shutdown / screen lock menu
 - Status
-  Description: Service health overview
-  Action key (#): Actions menu
+  Description: Service health overview, plus `update` next to Pi-hole when
+  a newer Core, Web or FTL release is out
+  Action key (#): Actions menu, including `Update Pi-hole` when one is
+  available
 
 ### Button layout
 
@@ -73,9 +75,20 @@ K4 (*)  hold 5s → wake the display while the screen lock is on
 
 The display sleeps after `DISPLAY_TIMEOUT` without input. Any button
 wakes it, unless the screen lock is on: then only holding * for 5 seconds
-does. The System menu (#) offers reboot, shutdown and the screen lock
+does. Long running actions such as a Pi-hole update hold it on until they
+finish, so the screen never blanks mid-update. The System menu (#) offers reboot, shutdown and the screen lock
 toggle, each with a yes/no confirmation. The lock setting is kept in
 `/var/lib/pihole-display/state.json`.
+
+## Pi-hole updates
+
+The Status screen shows `update` next to Pi-hole when Core, Web or FTL has a
+newer release, the same information the admin page puts in its footer. It is
+read from `GET /api/info/version` once an hour (`UPDATE_CHECK_INTERVAL`),
+since versions rarely change.
+
+When an update is available, the Status action menu (`#`) gains an
+`Update Pi-hole` entry that runs `pihole -up` after a yes/no prompt.
 
 ## Web UI
 
@@ -123,6 +136,13 @@ ssh -L 8080:localhost:8080 <user>@<BBB_IP_ADDRESS>
 ```
 
 To turn the web UI off entirely, set `WEB_ENABLED = False`.
+
+The systemd unit is hardened (`ProtectHome`, `PrivateTmp`,
+`ProtectKernelTunables`, `RestrictAddressFamilies`), but deliberately does
+**not** set `NoNewPrivileges` or `RestrictSUIDSGID`: `pihole -up` drops to
+the `pihole` user and uses setuid `sudo` to get back to root. With either
+flag on, the update aborts after stopping FTL and leaves the network without
+DNS.
 
 ## Mockups
 
@@ -173,6 +193,10 @@ To turn the web UI off entirely, set `WEB_ENABLED = False`.
 
   ![Status (error)](docs/mockups/09_status_error.png)
 
+- Status (update available):
+
+  ![Status (update available)](docs/mockups/09b_status_update.png)
+
 ### Menus
 
 - Pi-hole menu:
@@ -198,6 +222,10 @@ To turn the web UI off entirely, set `WEB_ENABLED = False`.
 - Status actions (scrolled):
 
   ![Status actions (scrolled)](docs/mockups/14b_menu_status_scrolled.png)
+
+- Status actions (update available):
+
+  ![Status actions with update](docs/mockups/14e_menu_status_update.png)
 
 - System menu:
 
@@ -236,6 +264,14 @@ To turn the web UI off entirely, set `WEB_ENABLED = False`.
 - Screen lock on:
 
   ![Screen lock on](docs/mockups/19c_message_lock_on.png)
+
+- Updating:
+
+  ![Updating](docs/mockups/19d_message_updating.png)
+
+- Update done:
+
+  ![Update done](docs/mockups/19e_message_update_ok.png)
 
 </details>
 
@@ -302,6 +338,7 @@ DISPLAY_ROTATE   = 2           # 180°, display mounted upside down
 PIHOLE_HOST      = 'localhost' # Pi-hole host
 PIHOLE_PASSWORD  = ''          # Pi-hole v6; empty = log in with /etc/pihole/cli_pw
 REFRESH_INTERVAL = 10          # seconds
+UPDATE_CHECK_INTERVAL = 3600   # seconds between Pi-hole update checks
 DISPLAY_TIMEOUT  = 60          # seconds until sleep (0 = never)
 HOLD_MS          = 5000        # hold * this long to wake a locked display
 

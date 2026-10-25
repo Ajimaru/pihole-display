@@ -34,6 +34,7 @@ class PiholeStats:  # pylint: disable=too-many-instance-attributes
     domains_blocked: int = 0
     pause_remaining: int = 0  # Remaining seconds while paused
     version: int = 5  # API version (5 or 6)
+    updates: int = 0  # Pi-hole components with a newer release (v6 only)
     error: str = ''
 
 
@@ -46,6 +47,8 @@ class PiholeAPI:
         self._version = None
         self._base_v5 = f'http://{config.PIHOLE_HOST}/admin/api.php'
         self._base_v6 = f'http://{config.PIHOLE_HOST}/api'
+        self._updates = 0
+        self._updates_checked = 0.0
 
     def _detect_version(self) -> int:
         try:
@@ -125,6 +128,64 @@ class PiholeAPI:
         r.raise_for_status()
         return r
 
+    def invalidate_update_check(self):
+        """Drop the cached version check so the next fetch asks again."""
+        self._updates_checked = 0.0
+
+    @staticmethod
+    def installed_versions() -> dict:
+        """Read the installed component versions from Pi-hole's own file.
+
+        Read straight off disk rather than through the API, because this
+        is used around an update, when FTL is restarting and the API is
+        unreachable. Returns {} when the file cannot be read.
+        """
+        found = {}
+        try:
+            with open(config.PIHOLE_VERSIONS, encoding='utf-8') as f:
+                for line in f:
+                    key, _, value = line.strip().partition('=')
+                    if key in ('CORE_VERSION', 'WEB_VERSION', 'FTL_VERSION'):
+                        found[key] = value
+        except OSError as e:
+            log.debug('Reading %s failed: %s', config.PIHOLE_VERSIONS, e)
+        return found
+
+    def _check_updates(self) -> int:
+        """Count Pi-hole components with a newer release available.
+
+        This is what the admin page shows in its footer. FTL serves it
+        from a cache it refreshes against GitHub on its own schedule, so
+        asking costs nothing on the network - but the answer only changes
+        once in a while, hence UPDATE_CHECK_INTERVAL between calls.
+        """
+        now = time.time()
+        if now - self._updates_checked < config.UPDATE_CHECK_INTERVAL:
+            return self._updates
+
+        self._updates_checked = now
+        try:
+            data = self._request_v6('GET', '/info/version').json()
+            versions = data.get('version', {})
+        except (requests.RequestException, ValueError) as e:
+            log.debug('Update check failed: %s', e)
+            return self._updates
+
+        outdated = 0
+        for part in ('core', 'web', 'ftl'):
+            entry = versions.get(part) or {}
+            local = (entry.get('local') or {}).get('version')
+            remote = (entry.get('remote') or {}).get('version')
+            # Both must be known: remote is null while FTL has not yet
+            # fetched its version cache, and that is not an update.
+            if local and remote and local != remote:
+                outdated += 1
+
+        if outdated != self._updates:
+            log.info('Pi-hole updates available: %d', outdated)
+        self._updates = outdated
+        return outdated
+
     def fetch(self) -> PiholeStats:
         """Return current Pi-hole stats using the detected API version."""
         stats = PiholeStats()
@@ -178,6 +239,7 @@ class PiholeAPI:
         # 'enabled', 'disabled', 'failed' or 'unknown'
         stats.enabled = db.get('blocking') == 'enabled'
         stats.pause_remaining = db.get('timer', 0) or 0
+        stats.updates = self._check_updates()
         return stats
 
     def set_blocking(self, enable: bool, seconds: int = 0) -> bool:
@@ -484,6 +546,19 @@ class DataCache:
             time.sleep(0.5)
             self.pihole = self._pihole_api.fetch()
         return ok
+
+    def invalidate_update_check(self):
+        """Force the next refresh to re-check versions.
+
+        Called after an update so the 'update' note clears right away
+        instead of lingering until UPDATE_CHECK_INTERVAL expires.
+        """
+        self._pihole_api.invalidate_update_check()
+
+    @staticmethod
+    def installed_versions() -> dict:
+        """Installed component versions, read from Pi-hole's own file."""
+        return PiholeAPI.installed_versions()
 
     def pihole_flush(self) -> bool:
         """Flush Pi-hole resolver cache."""

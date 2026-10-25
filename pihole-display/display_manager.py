@@ -7,6 +7,7 @@
 
 import time
 import logging
+from contextlib import contextmanager
 from enum import Enum, auto
 from typing import Callable, List, Optional, Tuple
 
@@ -125,6 +126,7 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         self._msg_until = 0.0
         self._last_input = time.monotonic()
         self._frame_sink: Optional[Callable] = None
+        self._keep_awake = False
 
     def _init_device(self):
         """Initialize the OLED device using configured I2C settings."""
@@ -161,6 +163,22 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
     def wake(self):
         """Public wrapper to wake display and reset inactivity timer."""
         self._wake()
+
+    @contextmanager
+    def keep_awake(self):
+        """Hold the display on for the duration of a long running job.
+
+        Used around actions like `pihole -up` that take minutes without
+        any button press. Releases on the way out even if the job raises,
+        so a failed action can never leave the screen stuck on.
+        """
+        self._keep_awake = True
+        self._wake()
+        try:
+            yield
+        finally:
+            self._keep_awake = False
+            self._last_input = time.monotonic()
 
     def set_frame_sink(self, sink: Optional[Callable]):
         """Register a callback receiving every rendered frame.
@@ -301,7 +319,15 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
             self._publish_frame(draw)
 
     def _enter_sleep_on_timeout(self, now: float) -> bool:
-        """Put display to sleep when inactivity timeout is reached."""
+        """Put display to sleep when inactivity timeout is reached.
+
+        A held wake lock keeps it on: a long job like `pihole -up` runs
+        for minutes without any input, and blanking the screen mid-update
+        leaves no sign of what is going on.
+        """
+        if self._keep_awake:
+            self._last_input = now
+            return False
         if (
             config.DISPLAY_TIMEOUT > 0
             and self._mode != UIMode.SLEEP
@@ -486,11 +512,16 @@ class DisplayManager:  # pylint: disable=too-many-instance-attributes
         sy = self._data.system
         self._header(draw, 'Status', '', True)
 
-        def row(y, label, ok):
+        def row(y, label, ok, note=''):
             marker = '[OK]' if ok else '[!!]'
             draw.text((0, y), f'{marker} {label}', font=_FONT_SM, fill='white')
+            if note:
+                # Right-aligned so the notes line up in one column
+                nx = self.W - int(_FONT_SM.getlength(note))
+                draw.text((nx, y), note, font=_FONT_SM, fill='white')
 
-        row(17, 'Pi-hole ', sy.pihole_ok)
+        updates = self._data.pihole.updates
+        row(17, 'Pi-hole ', sy.pihole_ok, 'update' if updates else '')
         row(28, 'Unbound ', sy.unbound_ok)
         row(39, 'DNS     ', sy.dns_ok)
         self._nav_hint(draw, 'Actions')

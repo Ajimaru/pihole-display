@@ -21,12 +21,16 @@ StateDirectory=pihole-display
 # and it now listens on a network port - so fence in what it does not need.
 # ProtectSystem=strict is deliberately absent: `pihole restartdns` and
 # `systemctl` would need so many exceptions that it stops being useful.
-NoNewPrivileges=true
+#
+# NoNewPrivileges is NOT set: `pihole -up` drops to the pihole user and
+# uses sudo to get back to root, which that flag blocks. With it on, the
+# update aborts after stopping FTL and leaves the network without DNS.
 ProtectHome=true
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectControlGroups=true
-RestrictSUIDSGID=true
+# RestrictSUIDSGID is NOT set either: it blocks the setuid sudo binary
+# that `pihole -up` relies on.
 # AF_NETLINK is required by psutil for network interface data.
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 

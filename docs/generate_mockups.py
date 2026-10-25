@@ -65,6 +65,9 @@ STATUS_MENU = [
     'Restart Pi-hole', 'Restart Unbound', 'Restart all', 'Refresh data',
 ]
 
+# Shown instead when Pi-hole reports a newer release
+STATUS_MENU_UPDATE = ['Update Pi-hole'] + STATUS_MENU
+
 
 def new_display(pihole=PIHOLE, unbound=UNBOUND, system=SYSTEM):
     """Create a DisplayManager on a dummy device with the given data."""
@@ -148,6 +151,10 @@ if __name__ == '__main__':
         '09_status_error.png', dm.Screen.STATUS,
         system=replace(SYSTEM, unbound_ok=False),
     )
+    screen(
+        '09b_status_update.png', dm.Screen.STATUS,
+        pihole=replace(PIHOLE, updates=3),
+    )
 
     print('--- Menus ---')
     menu('10_menu_pihole_active.png', PIHOLE_MENU)
@@ -156,6 +163,7 @@ if __name__ == '__main__':
     menu('13_menu_unbound.png', UNBOUND_MENU)
     menu('14_menu_status_actions.png', STATUS_MENU)
     menu('14b_menu_status_scrolled.png', STATUS_MENU, selected=3)
+    menu('14e_menu_status_update.png', STATUS_MENU_UPDATE)
     menu('14c_menu_system.png', ['Reboot', 'Shutdown', 'Screen lock: off'])
     menu('14d_confirm_reboot.png', ['No', 'Yes'], title='Reboot?')
 
@@ -170,6 +178,8 @@ if __name__ == '__main__':
     )
     message('Rebooting...', '19b_message_reboot.png')
     message('Screen lock\nON\n(hold * 5s)', '19c_message_lock_on.png')
+    message('Updating\nPi-hole...\nDNS is down', '19d_message_updating.png')
+    message('Update OK\nCore Ftl Web', '19e_message_update_ok.png')
     sleep()
 
     print()

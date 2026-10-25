@@ -35,6 +35,9 @@ logging.basicConfig(
 )
 log = logging.getLogger('main')
 
+# `pihole -up` compiles FTL on slow hardware; the BBB needs room.
+UPDATE_TIMEOUT = 1800
+
 
 # ── Application ──────────────────────────────────────────────
 
@@ -252,7 +255,13 @@ class App:  # pylint: disable=too-few-public-methods
         ])
 
     def _menu_status(self):
-        self._display.show_menu([
+        items = []
+        if self._data.pihole.updates:
+            # Only offered when something is actually out of date
+            items.append(('Update Pi-hole', partial(
+                self._confirm, 'Update?', self._pihole_update,
+            )))
+        items += [
             ('Restart Pi-hole',  self._pihole_restart),
             ('Restart Unbound',  self._unbound_restart),
             ('Restart all',      self._restart_all),
@@ -260,7 +269,8 @@ class App:  # pylint: disable=too-few-public-methods
                 'Refresh data',
                 lambda: self._trigger_refresh('Refreshing...'),
             ),
-        ])
+        ]
+        self._display.show_menu(items)
 
     def _menu_system(self):
         lock = 'on' if self._screen_lock else 'off'
@@ -351,6 +361,144 @@ class App:  # pylint: disable=too-few-public-methods
         self._display.show_message(
             'Cache cleared' if ok else 'Error!'
         )
+
+    def _pihole_update(self):
+        """Run `pihole -up`, which stops FTL and interrupts DNS.
+
+        Takes minutes and pulls from the network. The display is held
+        awake throughout, because blanking mid-update leaves no sign of
+        what is happening, and FTL is checked afterwards whatever the
+        outcome: an update that dies between stopping and restarting it
+        would otherwise leave the whole network without DNS.
+        """
+        log.info('Pi-hole update requested via menu')
+        with self._display.keep_awake():
+            self._run_pihole_update()
+            self._ensure_ftl_running()
+        self._data.invalidate_update_check()
+        self._trigger_refresh()
+
+    def _run_pihole_update(self):
+        """Run the updater and report what the versions actually did.
+
+        `pihole -up` exits 0 whether it upgraded anything, found nothing
+        to do, or failed partway, so its return code says very little.
+        What settles it is comparing the installed versions before and
+        after.
+        """
+        before = self._data.installed_versions()
+        self._display.show_message(
+            'Updating\nPi-hole...\nDNS is down',
+            duration=UPDATE_TIMEOUT,
+        )
+        try:
+            result = subprocess.run(
+                ['pihole', '-up'],
+                capture_output=True,
+                text=True,
+                timeout=UPDATE_TIMEOUT,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            log.error('pihole -up timed out after %ds', UPDATE_TIMEOUT)
+            self._display.show_message('Update\ntimed out!', duration=10)
+            return
+        except OSError as e:
+            log.error('pihole -up failed to start: %s', e)
+            self._display.show_message('Update\nfailed!', duration=10)
+            return
+
+        output = f'{result.stdout}\n{result.stderr}'
+        # The updater rewrites /etc/pihole/versions as its last step, so
+        # an interrupted run leaves it stale and the comparison would
+        # miss an upgrade that did happen. Refresh it first.
+        self._refresh_version_file()
+        after = self._data.installed_versions()
+        self._report_update(result.returncode, output, before, after)
+
+    @staticmethod
+    def _refresh_version_file():
+        """Have Pi-hole rewrite /etc/pihole/versions."""
+        try:
+            subprocess.run(
+                ['pihole', 'updatechecker'],
+                capture_output=True,
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            log.debug('updatechecker failed: %s', e)
+
+    def _report_update(self, returncode, output, before, after):
+        """Work out what the update did and say so."""
+        changed = sorted(
+            key.split('_')[0].title()
+            for key in set(before) | set(after)
+            if before.get(key) != after.get(key)
+        )
+        if changed:
+            for key in sorted(set(before) | set(after)):
+                if before.get(key) != after.get(key):
+                    log.info(
+                        'Pi-hole %s: %s -> %s', key.split('_')[0].lower(),
+                        before.get(key, '?'), after.get(key, '?'),
+                    )
+            self._display.show_message(
+                'Update OK\n' + ' '.join(changed), duration=8,
+            )
+            return
+
+        # Nothing moved. Either there was nothing to do, or it broke.
+        hard_fail = (
+            returncode != 0
+            or 'unable to open /etc/sudoers' in output
+            or 'Operation not permitted' in output
+        )
+        if hard_fail:
+            log.error(
+                'pihole -up failed (rc=%d): %s',
+                returncode, output.strip()[-300:],
+            )
+            self._display.show_message('Update\nfailed!', duration=10)
+        elif 'Everything is up to date' in output:
+            log.info('Pi-hole already up to date')
+            self._display.show_message('Already\nup to date', duration=5)
+        else:
+            # Clean exit, no version moved, no "up to date" either.
+            log.warning(
+                'pihole -up changed nothing: %s', output.strip()[-300:],
+            )
+            self._display.show_message('No change', duration=8)
+
+    def _ensure_ftl_running(self):
+        """Start pihole-FTL if the update left it stopped.
+
+        Without this a half-finished update takes DNS down for the whole
+        network until somebody notices and starts it by hand.
+        """
+        active = subprocess.run(
+            ['systemctl', 'is-active', '--quiet', 'pihole-FTL'],
+            timeout=15,
+            check=False,
+        )
+        if active.returncode == 0:
+            return
+
+        log.error('pihole-FTL is down after the update - starting it')
+        self._display.show_message('Restarting\nPi-hole DNS...', duration=30)
+        started = subprocess.run(
+            ['systemctl', 'start', 'pihole-FTL'],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if started.returncode == 0:
+            log.info('pihole-FTL started')
+            self._display.show_message('DNS back up', duration=5)
+        else:
+            log.error('Starting pihole-FTL failed: %s', started.stderr.strip())
+            self._display.show_message('DNS DOWN!\nCheck FTL', duration=60)
 
     def _pihole_restart(self):
         self._display.show_message('Pi-hole\nRestarting...')
