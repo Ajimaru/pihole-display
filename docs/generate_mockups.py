@@ -48,8 +48,8 @@ UNBOUND = UnboundStats(
     running=True, cache_percent=67.2, queries_total=12847, queries_ps=4.1,
 )
 SYSTEM = SystemStats(
-    hostname='beaglebone', ip_address='192.168.1.10',
-    gateway='192.168.1.1', cpu_percent=12, cpu_temp=48,
+    hostname='beaglebone', ip_address='10.0.0.10',
+    gateway='10.0.0.1', cpu_percent=12, cpu_temp=48,
     ram_used_mb=234, ram_total_mb=512, disk_used_gb=3.1,
     disk_total_gb=16.0, uptime_str='3d 14:22',
     pihole_ok=True, unbound_ok=True, dns_ok=True,

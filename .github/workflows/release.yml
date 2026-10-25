@@ -1,0 +1,96 @@
+name: Release
+
+# Releases are cut by pushing a tag. scripts/release.sh does that and keeps
+# the tag in step with version.py; this workflow verifies they match, so a
+# hand-made tag that disagrees fails here instead of shipping a wrong
+# version number to the display.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history, so the changelog can look back to the last tag.
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file=$(sed -n "s/^__version__ = '\(.*\)'$/\1/p" \
+                 pihole-display/version.py)
+          echo "Tag: $tag, version.py: $file"
+          if [ "$tag" != "$file" ]; then
+            echo "::error::Tag v$tag does not match version.py ($file)." \
+                 "Use scripts/release.sh to keep them in step."
+            exit 1
+          fi
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check syntax
+        run: python3 -m compileall -q pihole-display/*.py
+
+      - name: Build archive
+        id: build
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          name="pihole-display-${version}"
+          mkdir -p "dist/${name}/docs"
+          # Everything needed to set the thing up on an SBC, and nothing
+          # that is only useful in the repo: install.sh copies its whole
+          # directory to /opt, so anything added here lands there too.
+          cp pihole-display/*.py \
+             pihole-display/requirements.txt \
+             pihole-display/pihole-display.service \
+             pihole-display/install.sh \
+             "dist/${name}/"
+          # Docs that matter while wiring and installing, offline.
+          cp README.md LICENSE SECURITY.md THIRD_PARTY_LICENSES.md \
+             "dist/${name}/"
+          cp docs/WIRING_GUIDE.md "dist/${name}/docs/"
+          chmod +x "dist/${name}/install.sh"
+          # COPYFILE_DISABLE stops macOS tar from adding ._* AppleDouble
+          # files; harmless on Linux, and it keeps a locally built archive
+          # identical to this one.
+          COPYFILE_DISABLE=1 tar \
+            --exclude='__pycache__' --exclude='._*' \
+            -czf "dist/${name}.tar.gz" -C dist "${name}"
+          sha256sum "dist/${name}.tar.gz" | tee "dist/${name}.tar.gz.sha256"
+          echo "archive=dist/${name}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Build changelog
+        id: changelog
+        run: |
+          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" \
+                     2>/dev/null || true)
+          if [ -n "$previous" ]; then
+            range="${previous}..${GITHUB_REF_NAME}"
+            echo "Changes since ${previous}"
+          else
+            range="${GITHUB_REF_NAME}"
+            echo "First release - using full history"
+          fi
+
+          # Grouping lives in Python rather than sed, so it behaves the
+          # same here and when tested locally on a BSD sed machine.
+          git log --no-merges --pretty=$'%s\t%h' "$range" > commits.tsv
+          PREVIOUS="$previous" VERSION="${{ steps.version.outputs.version }}" \
+            python3 scripts/changelog.py commits.tsv > changelog.md
+          cat changelog.md
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: changelog.md
+          files: |
+            ${{ steps.build.outputs.archive }}
+            ${{ steps.build.outputs.archive }}.sha256

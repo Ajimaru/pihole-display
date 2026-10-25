@@ -295,6 +295,31 @@ on the BBB. Set both up first with the official Pi-hole documentation:
 
 ### Install pihole-display
 
+From a release (recommended) — the archive holds everything needed on the
+board, including the wiring guide:
+
+```bash
+# On the BBB — picks up whatever the latest release is
+REPO=Ajimaru/pihole-display
+VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" |
+          sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+echo "Installing v${VERSION}"
+
+BASE="https://github.com/${REPO}/releases/download/v${VERSION}"
+curl -fsSLO "${BASE}/pihole-display-${VERSION}.tar.gz"
+curl -fsSLO "${BASE}/pihole-display-${VERSION}.tar.gz.sha256"
+sha256sum -c "pihole-display-${VERSION}.tar.gz.sha256"
+
+tar -xzf "pihole-display-${VERSION}.tar.gz"
+cd "pihole-display-${VERSION}"
+sudo ./install.sh
+```
+
+To install a specific version instead, set `VERSION=0.1.0` by hand and skip
+the `curl` that looks it up.
+
+Or straight from a checkout, to run unreleased changes:
+
 ```bash
 # Copy to BeagleBone Black (root login is disabled on the BeagleBoard images)
 scp -r pihole-display/ <user>@<BBB_IP_ADDRESS>:/tmp/
@@ -375,6 +400,10 @@ docs/
 ├── mockups/               — rendered screen mockups
 └── kicad/                 — KiCad PCB for the cape
 
+scripts/
+├── release.sh             — set version.py, commit and tag a release
+└── changelog.py           — group commits into release notes
+
 stl/
 └── BBB_Cover.stl          — printable cover around the OLED display
 ```
@@ -408,6 +437,34 @@ already needed for rendering.
 
 System packages (installed by `install.sh`): `python3-venv`,
 `python3-libgpiod`, `gpiod`, `i2c-tools`, `libi2c-dev`, `fonts-dejavu-core`
+
+## Releases
+
+A release is cut by pushing a tag. `scripts/release.sh` sets `version.py`,
+commits and tags in one step, so the tag and the version the display shows
+can never drift apart:
+
+```bash
+./scripts/release.sh 0.2.0 --dry-run   # show what it would do
+./scripts/release.sh 0.2.0             # set version, commit, tag
+git push origin main v0.2.0            # this publishes the release
+```
+
+Pushing the tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml),
+which refuses to build if the tag and `version.py` disagree, then packs
+`pihole-display-<version>.tar.gz` with the modules, `install.sh`, the
+systemd unit, the licenses and the wiring guide, adds a `.sha256` next to
+it, and publishes a GitHub release. The notes are grouped from the commit
+subjects by their Conventional Commits prefix (`feat:`, `fix:`, `docs:`,
+…); anything without a prefix is listed under "Other", and a `!` marks a
+breaking change.
+
+To preview the notes before tagging:
+
+```bash
+git log --no-merges --pretty=$'%s\t%h' v0.1.0..HEAD |
+  VERSION=0.2.0 python3 scripts/changelog.py
+```
 
 ## License
 
