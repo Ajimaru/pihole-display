@@ -1,5 +1,6 @@
 # IDE / Tools
 /docs/kicad/pihole_display_cape.kicad_prl
+.ideas/
 
 # Python
 __pycache__/
