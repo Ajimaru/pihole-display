@@ -124,8 +124,16 @@ sudo journalctl -u pihole-display -f
 
 #### Updating an existing installation
 
-Run `install.sh` from the new archive the same way as above — it upgrades in
-place.
+Fetch and unpack the new release exactly like a fresh install — the same
+commands above, including the checksum check — then run `install.sh` from the
+new directory. It upgrades `/opt` in place.
+
+The running service keeps the old code until it is restarted, so finish with:
+
+```bash
+sudo systemctl restart pihole-display
+journalctl -u pihole-display -n 20 --no-pager
+```
 
 Site settings are not affected: they live in `/etc/pihole-display/config.py`,
 which the installer never overwrites. Settings a new release adds simply keep
