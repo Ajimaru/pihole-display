@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import logging
+import ssl
 import threading
 import time
 import urllib.parse
@@ -301,17 +302,20 @@ class _Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _cookie(token: str) -> tuple:
+        secure = 'Secure; ' if config.WEB_TLS_CERT else ''
         return (
             'Set-Cookie',
-            f'{COOKIE_NAME}={token}; Path=/; HttpOnly; SameSite=Strict; '
-            f'Max-Age={config.WEB_SESSION_HOURS * 3600}',
+            f'{COOKIE_NAME}={token}; Path=/; {secure}HttpOnly; '
+            f'SameSite=Strict; Max-Age={config.WEB_SESSION_HOURS * 3600}',
         )
 
     @staticmethod
     def _clear_cookie() -> tuple:
+        secure = 'Secure; ' if config.WEB_TLS_CERT else ''
         return (
             'Set-Cookie',
-            f'{COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0',
+            f'{COOKIE_NAME}=; Path=/; {secure}HttpOnly; SameSite=Strict; '
+            f'Max-Age=0',
         )
 
     # ── routing ──────────────────────────────────────────────
@@ -504,6 +508,48 @@ class _Server(ThreadingHTTPServer):
         super().__init__(address, handler)
 
 
+class _RedirectServer(ThreadingHTTPServer):
+    """Plain-HTTP listener that only sends clients to the TLS port."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class _RedirectHandler(BaseHTTPRequestHandler):
+    """Answer every plain-HTTP request with a redirect to HTTPS."""
+
+    server_version = 'pihole-display'
+    sys_version = ''
+
+    def do_GET(self):  # pylint: disable=invalid-name
+        """Redirect GET."""
+        self._redirect()
+
+    def do_HEAD(self):  # pylint: disable=invalid-name
+        """Redirect HEAD, without a body."""
+        self._redirect()
+
+    def do_POST(self):  # pylint: disable=invalid-name
+        """Redirect POST; clients re-submit over TLS."""
+        self._redirect()
+
+    def _redirect(self):
+        host = self.headers.get('Host') or config.WEB_HOST
+        if host.startswith('['):                 # [::1]:8080
+            hostname = host.split(']')[0] + ']'
+        else:
+            hostname = host.split(':')[0]
+        location = f'https://{hostname}:{config.WEB_PORT}{self.path}'
+        self.send_response(HTTPStatus.MOVED_PERMANENTLY)
+        self.send_header('Location', location)
+        self.send_header('Content-Length', '0')
+        self.end_headers()
+
+    def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
+        """Keep the redirect listener quiet; journald gets enough noise."""
+        log.debug('redirect: %s', fmt % args)
+
+
 # ── Public API ───────────────────────────────────────────────
 
 class WebServer:  # pylint: disable=R0902
@@ -520,12 +566,26 @@ class WebServer:  # pylint: disable=R0902
         self._display = display
         self._httpd = None
         self._thread = None
+        self._redirect_httpd = None
+        self._redirect_thread = None
 
     def start(self):
         """Bind the socket and start serving. Raises if the port is taken."""
         self._httpd = _Server(
             (config.WEB_HOST, config.WEB_PORT), _Handler, self,
         )
+        scheme = 'http'
+        if config.WEB_TLS_CERT:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            context.load_cert_chain(
+                config.WEB_TLS_CERT, config.WEB_TLS_KEY or None,
+            )
+            self._httpd.socket = context.wrap_socket(
+                self._httpd.socket, server_side=True,
+            )
+            scheme = 'https'
+
         self._display.set_frame_sink(self.frames.put)
         self._thread = threading.Thread(
             target=self._httpd.serve_forever,
@@ -534,14 +594,38 @@ class WebServer:  # pylint: disable=R0902
         )
         self._thread.start()
         log.info(
-            'Web UI on http://%s:%d',
-            config.WEB_HOST, config.WEB_PORT,
+            'Web UI on %s://%s:%d',
+            scheme, config.WEB_HOST, config.WEB_PORT,
         )
+
+        if scheme == 'https' and config.WEB_HTTP_REDIRECT_PORT:
+            self._redirect_httpd = _RedirectServer(
+                (config.WEB_HOST, config.WEB_HTTP_REDIRECT_PORT),
+                _RedirectHandler,
+            )
+            self._redirect_thread = threading.Thread(
+                target=self._redirect_httpd.serve_forever,
+                kwargs={'poll_interval': 0.5},
+                daemon=True,
+            )
+            self._redirect_thread.start()
+            log.info(
+                'HTTP redirect on http://%s:%d -> https://%s:%d',
+                config.WEB_HOST, config.WEB_HTTP_REDIRECT_PORT,
+                config.WEB_HOST, config.WEB_PORT,
+            )
 
     def stop(self):
         """Stop serving and detach from the display."""
         self._display.set_frame_sink(None)
         self.presses.cancel_all()
+        if self._redirect_httpd:
+            self._redirect_httpd.shutdown()
+            self._redirect_httpd.server_close()
+            self._redirect_httpd = None
+        if self._redirect_thread:
+            self._redirect_thread.join(timeout=3)
+            self._redirect_thread = None
         if self._httpd:
             self._httpd.shutdown()
             self._httpd.server_close()

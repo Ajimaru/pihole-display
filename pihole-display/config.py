@@ -63,6 +63,15 @@ WEB_MAX_ATTEMPTS = 5        # Failed logins before lockout
 WEB_LOCKOUT_SEC = 60        # Lockout duration per IP
 WEB_SCALE = 4               # Display zoom in the browser (128x64 -> 512x256)
 
+# --- TLS ------------------------------------------------------------
+# Set WEB_TLS_CERT to serve the web UI over HTTPS. A combined PEM holding
+# certificate and private key works; a separate key file can be passed via
+# WEB_TLS_KEY. Empty means plain HTTP, as before.
+WEB_TLS_CERT = ''           # e.g. '/etc/pihole/tls.pem'
+WEB_TLS_KEY = ''            # only needed if the key is not in WEB_TLS_CERT
+# Optional plain-HTTP port that redirects to the HTTPS one. 0 disables it.
+WEB_HTTP_REDIRECT_PORT = 0  # e.g. 8080 while WEB_PORT = 8443
+
 # --- Site overrides -------------------------------------------------
 # This file only carries the defaults and is replaced on every update. Site
 # settings belong in /etc/pihole-display/config.py, which is loaded on top of

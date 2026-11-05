@@ -323,6 +323,28 @@ WEB_SCALE        = 4           # Display zoom in the browser
 With `PIHOLE_PASSWORD` empty, the service logs in with Pi-hole's local CLI
 password file, so no password has to be stored in the settings file.
 
+### HTTPS
+
+The web UI speaks plain HTTP by default. To serve it over TLS, point
+`WEB_TLS_CERT` at a PEM file — a combined certificate and private key works,
+a separate key can be supplied through `WEB_TLS_KEY`:
+
+```python
+WEB_PORT               = 8443
+WEB_TLS_CERT           = '/etc/pihole/tls.pem'  # Pi-hole's self-signed cert
+WEB_HTTP_REDIRECT_PORT = 8080                  # plain HTTP -> HTTPS
+```
+
+The redirect listener answers every plain request with `301 Moved
+Permanently` to the TLS port, keeping the path. As soon as a certificate is
+configured, the session cookie carries the `Secure` flag. Leave
+`WEB_TLS_CERT` empty to go back to plain HTTP; `WEB_HTTP_REDIRECT_PORT = 0`
+disables the redirect listener.
+
+The certificate is not validated against a CA — browsers warn on the
+self-signed Pi-hole certificate. Accessing the UI as `https://pi.hole:8443`
+matches its `CN` and avoids that warning on machines using Pi-hole for DNS.
+
 ## Development
 
 ### Project structure
