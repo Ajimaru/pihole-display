@@ -561,6 +561,10 @@ class _RedirectHandler(BaseHTTPRequestHandler):
         location = (
             f'https://{self._hostname()}:{config.WEB_PORT}{self._target()}'
         )
+        # Strip line breaks on the final value, right where it reaches the
+        # header. CodeQL recognises this exact pattern; the regex check and
+        # quote() above are not modelled as sanitisers.
+        location = location.replace('\r', '').replace('\n', '')
         self.send_response(HTTPStatus.MOVED_PERMANENTLY)
         self.send_header('Location', location)
         self.send_header('Content-Length', '0')
