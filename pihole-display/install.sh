@@ -42,7 +42,62 @@ fi
 # Create installation directory
 echo "[3/6] Creating installation directory: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
+
+# Shipped config.py only carries the defaults. Site settings live in
+# /etc/pihole-display/config.py and are loaded on top of them at startup, so
+# an update can replace /opt wholesale without touching them.
+CONFIG_OVERRIDE_DIR="/etc/pihole-display"
+CONFIG_OVERRIDE="$CONFIG_OVERRIDE_DIR/config.py"
+BACKUP_DIR="/var/backups/pihole-display"
+if [ -f "$INSTALL_DIR/config.py" ] && ! cmp -s "$INSTALL_DIR/config.py" ./config.py; then
+    # Older installations edited /opt/config.py in place. Carry those settings
+    # over once, otherwise this update would reset them to the defaults.
+    mkdir -p "$CONFIG_OVERRIDE_DIR"
+    chmod 755 "$CONFIG_OVERRIDE_DIR"
+    if [ -f "$CONFIG_OVERRIDE" ]; then
+        # Both exist - /etc wins. Keep the old copy so nothing is lost
+        # silently, and point at the diff.
+        mkdir -p "$BACKUP_DIR"
+        OLD_CONFIG="$BACKUP_DIR/config.py.$(date +%Y%m%d-%H%M%S)"
+        cp -p "$INSTALL_DIR/config.py" "$OLD_CONFIG"
+        echo "  $CONFIG_OVERRIDE already exists and is kept."
+        echo "  Old /opt config saved to $OLD_CONFIG - compare with:"
+        echo "    diff $OLD_CONFIG $CONFIG_OVERRIDE"
+    else
+        cp -p "$INSTALL_DIR/config.py" "$CONFIG_OVERRIDE"
+        chmod 600 "$CONFIG_OVERRIDE"
+        # A legacy /opt file may still carry the shipped defaults and the
+        # override loader. A site file needs neither, and the loader would
+        # keep loading itself, so keep only what precedes the marker.
+        python3 - "$CONFIG_OVERRIDE" <<'PY'
+import sys
+
+path = sys.argv[1]
+marker = '# --- Site overrides'
+with open(path, encoding='utf-8') as handle:
+    text = handle.read()
+if marker in text:
+    with open(path, 'w', encoding='utf-8') as handle:
+        handle.write(text.split(marker)[0].rstrip() + '\n')
+PY
+        echo "  Site config migrated to $CONFIG_OVERRIDE (mode 600)."
+    fi
+fi
+
 cp -r ./* "$INSTALL_DIR/"
+
+# A broken override stops the service at import time, so check it while the
+# installer is still on screen. compile() rather than py_compile keeps
+# __pycache__ out of /etc.
+if [ -f "$CONFIG_OVERRIDE" ]; then
+    if python3 -c 'import sys; compile(open(sys.argv[1], encoding="utf-8").read(), sys.argv[1], "exec")' "$CONFIG_OVERRIDE"; then
+        echo "  $CONFIG_OVERRIDE is valid Python."
+    else
+        echo "error: $CONFIG_OVERRIDE does not compile - the service will not start." >&2
+        echo "       Fix it, or delete the file to use the shipped defaults." >&2
+        exit 1
+    fi
+fi
 
 # Python Virtual Environment
 echo "[4/6] Installing Python venv and packages..."
@@ -133,5 +188,5 @@ echo "- Show logs:"
 echo "   sudo journalctl -u $SERVICE -f"
 echo ""
 echo "Note: Pi-hole v6 login needs no setup. With PIHOLE_PASSWORD empty in"
-echo "$INSTALL_DIR/config.py, /etc/pihole/cli_pw is used."
+echo "$CONFIG_OVERRIDE (or the shipped defaults), /etc/pihole/cli_pw is used."
 echo ""

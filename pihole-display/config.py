@@ -1,5 +1,8 @@
 """Configuration values for pihole-display hardware and runtime behavior."""
 
+import os as _os
+import runpy
+
 # ============================================================
 # config.py — Configuration for pihole-display
 # BeagleBone Black + SSD1315 OLED + 4 buttons
@@ -59,3 +62,22 @@ WEB_SESSION_HOURS = 168     # Session lifetime (7 days)
 WEB_MAX_ATTEMPTS = 5        # Failed logins before lockout
 WEB_LOCKOUT_SEC = 60        # Lockout duration per IP
 WEB_SCALE = 4               # Display zoom in the browser (128x64 -> 512x256)
+
+# --- Site overrides -------------------------------------------------
+# This file only carries the defaults and is replaced on every update. Site
+# settings belong in /etc/pihole-display/config.py, which is loaded on top of
+# this module: assign any name defined above to override it, and leave the
+# rest out to keep its default.
+_OVERRIDE_PATH = _os.environ.get(
+    'PIHOLE_DISPLAY_CONFIG', '/etc/pihole-display/config.py')
+
+if (_os.path.isfile(_OVERRIDE_PATH)
+        and _os.path.realpath(_OVERRIDE_PATH)
+        != _os.path.realpath(__file__)):
+    # Run in its own namespace: the file is not imported as a module, and a
+    # copy of this file used as the override skips its own loader instead of
+    # running it again.
+    _site_values = runpy.run_path(_OVERRIDE_PATH)
+    globals().update(
+        {name: value for name, value in _site_values.items()
+         if not name.startswith('__')})

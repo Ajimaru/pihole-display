@@ -122,6 +122,25 @@ sudo systemctl start pihole-display
 sudo journalctl -u pihole-display -f
 ```
 
+#### Updating an existing installation
+
+Run `install.sh` from the new archive the same way as above — it upgrades in
+place.
+
+Site settings are not affected: they live in `/etc/pihole-display/config.py`,
+which the installer never overwrites. Settings a new release adds simply keep
+their default until you assign them, so there is no merge step and the service
+cannot fail on a missing attribute.
+
+When updating from a version that still kept settings in
+`/opt/pihole-display/config.py`, the installer carries that file over to
+`/etc/pihole-display/config.py` (mode `0600`) once. If both exist, the `/etc`
+file wins; the old copy is saved to `/var/backups/pihole-display/` and the
+`diff` command is printed, so you can see what you had.
+
+Runtime state (`state.json`, the web password file) lives in
+`/var/lib/pihole-display` and is never touched by the installer.
+
 The web UI is then available at `http://<BBB_IP_ADDRESS>:8080` — log in with
 `admin` / `pihole` and change the password straight away (see [Web UI](#web-ui)).
 
@@ -243,7 +262,7 @@ otherwise looks like a wrong one.
 - After 5 failed logins an IP is locked out for 60 seconds.
 
 To restrict access to an SSH tunnel, set `WEB_HOST = '127.0.0.1'` in
-`config.py` and connect with:
+`/etc/pihole-display/config.py` and connect with:
 
 ```bash
 ssh -L 8080:localhost:8080 <user>@<BBB_IP_ADDRESS>
@@ -260,9 +279,20 @@ DNS.
 
 ## Configuration
 
-Edit `pihole-display/config.py` before installation, or later
-`/opt/pihole-display/config.py` followed by
-`sudo systemctl restart pihole-display`:
+Site settings live in `/etc/pihole-display/config.py` (mode `0600`, root
+only), which is loaded on top of the shipped defaults in
+`/opt/pihole-display/config.py`. Assign only the names you want to change —
+everything else keeps its default, so a new release can add settings without
+breaking your file. After editing, restart the service:
+
+```bash
+sudo systemctl restart pihole-display
+```
+
+The installer creates the file when it finds settings in an old
+`/opt/pihole-display/config.py`, and never overwrites it afterwards.
+
+Example (all of it optional, defaults shown):
 
 ```python
 I2C_PORT         = 2           # /dev/i2c-2
@@ -283,7 +313,7 @@ WEB_SCALE        = 4           # Display zoom in the browser
 ```
 
 With `PIHOLE_PASSWORD` empty, the service logs in with Pi-hole's local CLI
-password file, so no password has to be stored in `config.py`.
+password file, so no password has to be stored in the settings file.
 
 ## Development
 
