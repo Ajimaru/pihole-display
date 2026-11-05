@@ -307,6 +307,8 @@ I2C_PORT         = 2           # /dev/i2c-2
 I2C_ADDRESS      = 0x3C        # or 0x3D
 DISPLAY_ROTATE   = 2           # 180°, display mounted upside down
 PIHOLE_HOST      = 'localhost' # Pi-hole host
+PIHOLE_SCHEME    = 'http'      # 'https' when Pi-hole redirects HTTP to HTTPS
+PIHOLE_TLS_VERIFY = True       # CA file path, or False for self-signed
 PIHOLE_PASSWORD  = ''          # Pi-hole v6; empty = log in with /etc/pihole/cli_pw
 REFRESH_INTERVAL = 10          # seconds
 UPDATE_CHECK_INTERVAL = 3600   # seconds between Pi-hole update checks
@@ -319,6 +321,17 @@ WEB_PORT         = 8080        # Pi-hole admin already uses :80
 WEB_USER         = 'admin'     # Login name
 WEB_SCALE        = 4           # Display zoom in the browser
 ```
+
+Since Pi-hole v6 redirects HTTP to HTTPS by default, point the app straight at
+TLS. With the self-signed certificate, either trust Pi-hole's CA file or turn
+verification off for the local connection:
+
+```python
+PIHOLE_HOST       = 'pi.hole'              # matches the certificate's SAN
+PIHOLE_SCHEME     = 'https'
+PIHOLE_TLS_VERIFY = '/etc/pihole/tls_ca.crt'
+```
+
 
 With `PIHOLE_PASSWORD` empty, the service logs in with Pi-hole's local CLI
 password file, so no password has to be stored in the settings file.

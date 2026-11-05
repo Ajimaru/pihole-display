@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import requests
+import urllib3
 import psutil
 
 import config
@@ -45,14 +46,22 @@ class PiholeAPI:
         self._session_token = None  # for v6
         self._api_token = None  # for v5
         self._version = None
-        self._base_v5 = f'http://{config.PIHOLE_HOST}/admin/api.php'
-        self._base_v6 = f'http://{config.PIHOLE_HOST}/api'
+        self._base_v5 = (
+            f'{config.PIHOLE_SCHEME}://{config.PIHOLE_HOST}/admin/api.php'
+        )
+        self._base_v6 = f'{config.PIHOLE_SCHEME}://{config.PIHOLE_HOST}/api'
+        self._verify = config.PIHOLE_TLS_VERIFY
+        if self._verify is False:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self._updates = 0
         self._updates_checked = 0.0
 
     def _detect_version(self) -> int:
         try:
-            r = requests.get(f'{self._base_v6}/stats/summary', timeout=3)
+            r = requests.get(
+                f'{self._base_v6}/stats/summary', timeout=3,
+                verify=self._verify,
+            )
             if r.status_code in (200, 401):
                 return 6
         except requests.RequestException:
@@ -94,7 +103,8 @@ class PiholeAPI:
             r = requests.post(
                 f'{self._base_v6}/auth',
                 json={'password': password},
-                timeout=3
+                timeout=3,
+                verify=self._verify,
             )
             data = r.json()
             self._session_token = data.get('session', {}).get('sid')
@@ -120,6 +130,7 @@ class PiholeAPI:
                 f'{self._base_v6}{path}',
                 headers=self._headers_v6(),
                 timeout=5,
+                verify=self._verify,
                 **kwargs,
             )
             if r.status_code != 401 or attempt:
@@ -211,7 +222,9 @@ class PiholeAPI:
     def _fetch_v5(self, stats: PiholeStats) -> PiholeStats:
         if not self._api_token:
             self._api_token = self._load_v5_token()
-        r = requests.get(f'{self._base_v5}?summary', timeout=5)
+        r = requests.get(
+            f'{self._base_v5}?summary', timeout=5, verify=self._verify,
+        )
         d = r.json()
         stats.version = 5
         stats.enabled = d.get('status', '') == 'enabled'
@@ -271,7 +284,7 @@ class PiholeAPI:
             url = f'{self._base_v5}?enable&auth={self._api_token}'
         else:
             url = f'{self._base_v5}?disable={seconds}&auth={self._api_token}'
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=5, verify=self._verify)
         return r.status_code == 200
 
     def _set_blocking_v6(self, enable: bool, seconds: int) -> bool:

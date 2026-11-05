@@ -24,6 +24,11 @@ BTN_BACK = 4   # P8_10 = K4 (*)
 
 # --- Pi-hole ---
 PIHOLE_HOST = 'localhost'
+# Pi-hole v6 redirects HTTP to HTTPS, so 'https' saves the extra round trip.
+# Its certificate is self-signed: point PIHOLE_TLS_VERIFY at Pi-hole's CA file
+# (e.g. '/etc/pihole/tls_ca.crt'), or set it to False to skip verification.
+PIHOLE_SCHEME = 'http'
+PIHOLE_TLS_VERIFY = True
 PIHOLE_SETUPVARS = '/etc/pihole/setupVars.conf'
 # Pi-hole v6 password. Leave empty to log in with Pi-hole's local CLI
 # password file (needs root, which the service runs as).

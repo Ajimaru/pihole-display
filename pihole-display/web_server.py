@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import logging
+import re
 import ssl
 import threading
 import time
@@ -521,6 +522,10 @@ class _RedirectHandler(BaseHTTPRequestHandler):
     server_version = 'pihole-display'
     sys_version = ''
 
+    # A Host header that does not look like a host name is ignored; the
+    # configured address is used instead.
+    HOST_PATTERN = re.compile(r'^[A-Za-z0-9._\-:\[\]]+$')
+
     def do_GET(self):  # pylint: disable=invalid-name
         """Redirect GET."""
         self._redirect()
@@ -533,13 +538,29 @@ class _RedirectHandler(BaseHTTPRequestHandler):
         """Redirect POST; clients re-submit over TLS."""
         self._redirect()
 
-    def _redirect(self):
+    def _hostname(self) -> str:
+        """Host header reduced to a bare host name, or the fallback."""
         host = self.headers.get('Host') or config.WEB_HOST
+        if not self.HOST_PATTERN.match(host):
+            host = config.WEB_HOST
         if host.startswith('['):                 # [::1]:8080
-            hostname = host.split(']')[0] + ']'
-        else:
-            hostname = host.split(':')[0]
-        location = f'https://{hostname}:{config.WEB_PORT}{self.path}'
+            return host.split(']')[0] + ']'
+        return host.split(':')[0]
+
+    def _target(self) -> str:
+        """Request path and query, percent-encoded for a header value."""
+        parts = urllib.parse.urlsplit(self.path)
+        target = urllib.parse.quote(parts.path or '/', safe='/')
+        if parts.query:
+            target = f'{target}?{urllib.parse.quote(parts.query, safe="=")}'
+        # quote() already removes CR/LF; the explicit strip keeps the
+        # guarantee local to the header that depends on it.
+        return target.replace('\r', '').replace('\n', '')
+
+    def _redirect(self):
+        location = (
+            f'https://{self._hostname()}:{config.WEB_PORT}{self._target()}'
+        )
         self.send_response(HTTPStatus.MOVED_PERMANENTLY)
         self.send_header('Location', location)
         self.send_header('Content-Length', '0')
